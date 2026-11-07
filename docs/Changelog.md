@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- version list -->
 
+## v2.1.10 (2026-11-07)
+
+### Chores
+
+- **deps**: Bump rdkit from 2026.3.6 to 2026.9.1
+  ([#108](https://github.com/Bayer-Group/MotherML/pull/108),
+  [`c3499a8`](https://github.com/Bayer-Group/MotherML/commit/c3499a84cfca0de409e735a8282a6cf120bbeaf2))
+
+
 ## v2.1.9 (2026-11-07)
 
 ### Chores
