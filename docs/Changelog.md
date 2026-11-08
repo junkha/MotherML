@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- version list -->
 
+## v2.1.11 (2026-11-08)
+
+### Chores
+
+- **deps-dev**: Bump ruff from 0.16.10 to 0.17.3
+  ([#107](https://github.com/Bayer-Group/MotherML/pull/107),
+  [`af68bb6`](https://github.com/Bayer-Group/MotherML/commit/af68bb687707926769cc29ffc7252096ebb2b833))
+
+
 ## v2.1.10 (2026-11-07)
 
 ### Chores
