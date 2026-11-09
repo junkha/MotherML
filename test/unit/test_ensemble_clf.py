@@ -8,9 +8,9 @@ from sklearn.pipeline import Pipeline
 
 from mother.ml.core import AbstractMotherPipeline
 from mother.ml.ensembles.cvEnsemble import (
-    CVEnsembleAveragingClassifier,
     CVEnsembleClassifierMother,
-    CVEnsembleDerivedClassifier,
+    EnsembleAverageUncertaintyClassifier,
+    EnsembleDerivedUncertaintyClassifier,
     EnsembleDerivedUncertaintyMethod,
 )
 
@@ -184,7 +184,7 @@ def X():
 def binary_ensemble(binary_probas, knowledge_uncertainties):
     first_proba, second_proba = binary_probas
     first_unc, second_unc = knowledge_uncertainties
-    return CVEnsembleDerivedClassifier(
+    return EnsembleDerivedUncertaintyClassifier(
         [
             _FakeClassifier(first_proba, first_unc, classes=[0, 1]),
             _FakeClassifier(second_proba, second_unc, classes=[0, 1]),
@@ -196,7 +196,7 @@ def binary_ensemble(binary_probas, knowledge_uncertainties):
 def multiclass_ensemble(multiclass_probas, knowledge_uncertainties):
     first_proba, second_proba = multiclass_probas
     first_unc, second_unc = knowledge_uncertainties
-    return CVEnsembleDerivedClassifier(
+    return EnsembleDerivedUncertaintyClassifier(
         [
             _FakeClassifier(first_proba, first_unc, classes=[0, 1, 2]),
             _FakeClassifier(second_proba, second_unc, classes=[0, 1, 2]),
@@ -226,15 +226,17 @@ class TestEnsembleClassifierInitialization:
 
     def test_single_estimator_raises(self, binary_probas, knowledge_uncertainties):
         with pytest.raises(ValueError, match=r"At least two estimators"):
-            CVEnsembleDerivedClassifier([_FakeClassifier(binary_probas[0], knowledge_uncertainties[0], classes=[0, 1])])
+            EnsembleDerivedUncertaintyClassifier(
+                [_FakeClassifier(binary_probas[0], knowledge_uncertainties[0], classes=[0, 1])]
+            )
 
     def test_empty_estimator_list_raises(self):
         with pytest.raises(ValueError, match=r"At least two estimators"):
-            CVEnsembleDerivedClassifier([])
+            EnsembleDerivedUncertaintyClassifier([])
 
     def test_unfitted_estimator_raises(self):
         with pytest.raises(ValueError, match=r"is not fitted"):
-            CVEnsembleDerivedClassifier(
+            EnsembleDerivedUncertaintyClassifier(
                 [
                     _UnfittedClassifier(),
                     _UnfittedClassifier(),
@@ -243,7 +245,7 @@ class TestEnsembleClassifierInitialization:
 
     def test_noncallable_predict_uncertainty_raises(self, binary_probas, knowledge_uncertainties):
         with pytest.raises(ValueError, match=r"must have a 'predict_uncertainty' method"):
-            CVEnsembleDerivedClassifier(
+            EnsembleDerivedUncertaintyClassifier(
                 [
                     _ClassifierWithoutPredictUncertainty(),
                     _ClassifierWithoutPredictUncertainty(),
@@ -252,7 +254,7 @@ class TestEnsembleClassifierInitialization:
 
     def test_missing_class_labels_raise(self, binary_probas, knowledge_uncertainties):
         with pytest.raises(ValueError, match=r"must have a 'classes_' attribute"):
-            CVEnsembleDerivedClassifier(
+            EnsembleDerivedUncertaintyClassifier(
                 [
                     _ClassifierWithoutClasses(),
                     _ClassifierWithoutClasses(),
@@ -263,7 +265,7 @@ class TestEnsembleClassifierInitialization:
         first_proba, second_proba = binary_probas
         first_unc, second_unc = knowledge_uncertainties
         with pytest.raises(ValueError, match=r"must be of type _FakeClassifier"):
-            CVEnsembleDerivedClassifier(
+            EnsembleDerivedUncertaintyClassifier(
                 [
                     _FakeClassifier(first_proba, first_unc, classes=[0, 1]),
                     _ClassifierWithoutClasses(),
@@ -274,7 +276,7 @@ class TestEnsembleClassifierInitialization:
         first_proba, second_proba = binary_probas
         first_unc, second_unc = knowledge_uncertainties
         with pytest.raises(ValueError, match=r"same class labels"):
-            CVEnsembleDerivedClassifier(
+            EnsembleDerivedUncertaintyClassifier(
                 [
                     _FakeClassifier(first_proba, first_unc, classes=[0, 1]),
                     _FakeClassifier(second_proba, second_unc, classes=["active", "inactive"]),
@@ -301,7 +303,7 @@ class TestSklearnCompatibility:
         assert sk_base.is_classifier(binary_ensemble)
 
     def test_concrete_variants_inherit_meta_estimator_base(self, binary_ensemble):
-        averaging_ensemble = CVEnsembleAveragingClassifier(binary_ensemble.estimators)
+        averaging_ensemble = EnsembleAverageUncertaintyClassifier(binary_ensemble.estimators)
         assert isinstance(binary_ensemble, CVEnsembleClassifierMother)
         assert isinstance(averaging_ensemble, CVEnsembleClassifierMother)
         assert isinstance(binary_ensemble, MetaEstimatorMixin)
@@ -451,7 +453,7 @@ class TestEnsembleClassifierPredictions:
         first_proba, second_proba = binary_probas
         first_unc, second_unc = knowledge_uncertainties
         labels = np.array(["active", "inactive"])
-        ensemble = CVEnsembleDerivedClassifier(
+        ensemble = EnsembleDerivedUncertaintyClassifier(
             [
                 _FakeClassifier(first_proba, first_unc, classes=labels),
                 _FakeClassifier(second_proba, second_unc, classes=labels),
@@ -466,7 +468,7 @@ class TestEnsembleClassifierPredictions:
     def test_identical_members_have_zero_uncertainty(self, binary_probas, knowledge_uncertainties, X, method):
         first_proba = binary_probas[0]
         first_unc = knowledge_uncertainties[0]
-        ensemble = CVEnsembleDerivedClassifier(
+        ensemble = EnsembleDerivedUncertaintyClassifier(
             [
                 _FakeClassifier(first_proba, first_unc, classes=[0, 1]),
                 _FakeClassifier(first_proba.copy(), first_unc.copy(), classes=[0, 1]),
@@ -497,7 +499,7 @@ class TestEnsembleClassifierPredictions:
         third = np.array([[0.1, 0.9], [0.1, 0.9], [0.2, 0.8]])
         first_unc, second_unc = knowledge_uncertainties
         third_unc = np.array([0.9, 0.8, 0.2])
-        ensemble = CVEnsembleDerivedClassifier(
+        ensemble = EnsembleDerivedUncertaintyClassifier(
             [
                 _FakeClassifier(first, first_unc, classes=[0, 1]),
                 _FakeClassifier(second, second_unc, classes=[0, 1]),
@@ -515,7 +517,7 @@ class TestEnsembleClassifierPredictions:
 class TestEnsembleClassifierErrorHandling:
     def test_empty_uncertainty_raises(self, binary_probas, knowledge_uncertainties, X):
         first, second = binary_probas
-        ensemble = CVEnsembleAveragingClassifier(
+        ensemble = EnsembleAverageUncertaintyClassifier(
             [
                 _ClassifierWithoutKnowledgeUncertaintyValues(first, classes=[0, 1]),
                 _ClassifierWithoutKnowledgeUncertaintyValues(second, classes=[0, 1]),
@@ -531,7 +533,7 @@ class TestEnsembleClassifierErrorHandling:
         second_data = np.array([0.4, 0.6, 0.8])
         first_total = first_knowledge + first_data
         second_total = second_knowledge + second_data
-        ensemble = CVEnsembleAveragingClassifier(
+        ensemble = EnsembleAverageUncertaintyClassifier(
             [
                 _FakeClassifier(
                     first_proba, first_knowledge, [0, 1], data_uncertainties=first_data, total_uncertainties=first_total
@@ -556,7 +558,7 @@ class TestEnsembleClassifierErrorHandling:
     ):
         first_proba, second_proba = binary_probas
         first_uncertainty, second_uncertainty = knowledge_uncertainties
-        ensemble = CVEnsembleAveragingClassifier(
+        ensemble = EnsembleAverageUncertaintyClassifier(
             [
                 _FakeClassifier(first_proba, first_uncertainty, [0, 1]),
                 _FakeClassifier(
@@ -575,7 +577,7 @@ class TestEnsembleClassifierErrorHandling:
         first_proba, second_proba = binary_probas
         first_uncertainty, second_uncertainty = knowledge_uncertainties
         negative_uncertainty = np.array([0.1, -0.2, 0.3])
-        ensemble = CVEnsembleAveragingClassifier(
+        ensemble = EnsembleAverageUncertaintyClassifier(
             [
                 _FakeClassifier(first_proba, first_uncertainty, [0, 1]),
                 _FakeClassifier(
