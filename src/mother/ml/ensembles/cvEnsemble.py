@@ -115,8 +115,8 @@ class CVEnsembleClassifierMother(AbstractMotherPipeline, MetaEstimatorMixin, Cla
         """
         Set the fitted attributes for the ensemble based on its member estimators.
 
-        Raises:
-            ValueError: If any estimator has invalid class labels or if class labels are inconsistent across estimators.
+        Returns:
+            None
         """
         if hasattr(self, "classes_") and self.classes_ is not None:
             return
@@ -149,14 +149,22 @@ class CVEnsembleClassifierMother(AbstractMotherPipeline, MetaEstimatorMixin, Cla
     def __sklearn_clone__(self):
         """
         Return an independent frozen ensemble, preserving fitted ensemble estimators.
+
         Overrides the default sklearn clone behavior.
+
+        Returns:
+            self: A deepcopy of the ensemble instance with all fitted estimators preserved.
         """
         return deepcopy(self)
 
     def __sklearn_tags__(self):
         """
         Returns the scikit-learn estimator tags for the ensemble.
-        Advertised only real ensemble capabilities.
+
+        Advertises only real ensemble capabilities.
+
+        Returns:
+            dict: Scikit-learn tags dictionary with multi-output set to False.
         """
         tags = super().__sklearn_tags__()
 
@@ -255,13 +263,13 @@ class CVEnsembleClassifierMother(AbstractMotherPipeline, MetaEstimatorMixin, Cla
 
     def _collect_member_probas(self, X: pd.DataFrame) -> np.ndarray:
         """
-        Coordinates probability prediction of all ensemble members.
+        Collect predicted probabilities from all ensemble members.
 
         Args:
             X (pd.DataFrame): Input features.
 
         Returns:
-            np.ndarray: Stacked probabilities from all members, shape (n_estimators, n_samples, n_classes)
+            np.ndarray: Stacked probabilities, shape (n_estimators, n_samples, n_classes).
         """
         probas = []
         for estimator in self.estimators:
@@ -271,14 +279,16 @@ class CVEnsembleClassifierMother(AbstractMotherPipeline, MetaEstimatorMixin, Cla
 
     def _extract_member_probas(self, prediction: pd.DataFrame | np.ndarray) -> np.ndarray:
         """
-        Extracts and validates member probabilities for one estimator.
+        Extract and validate member probabilities from an estimator output.
 
         Args:
             prediction (pd.DataFrame | np.ndarray): Raw output from the estimator.
-                Can contain proba and uncertainty columns.
 
         Returns:
-            np.ndarray: Validated class probabilities, shape (n_samples, n_classes)
+            np.ndarray: Validated class probabilities, shape (n_samples, n_classes).
+
+        Raises:
+            ValueError: If probabilities are invalid (NaN, out of [0, 1], or don't sum to 1).
         """
         proba_columns = [f"proba_{i}" for i in range(len(self.classes_))]
 
@@ -315,6 +325,20 @@ class CVEnsembleClassifierMother(AbstractMotherPipeline, MetaEstimatorMixin, Cla
         data_uncertainty: np.ndarray | None = None,
         total_uncertainty: np.ndarray | None = None,
     ) -> pd.DataFrame:
+        """
+        Construct a results DataFrame from predictions and uncertainties.
+
+        Args:
+            X (pd.DataFrame): Input features (used for index).
+            ensemble_pred (np.ndarray): Predicted class labels, shape (n_samples,).
+            ensemble_probas (np.ndarray): Class probabilities, shape (n_samples, n_classes).
+            knowledge_uncertainty (np.ndarray | None): Knowledge uncertainty, shape (n_samples,).
+            data_uncertainty (np.ndarray | None): Data uncertainty, shape (n_samples,).
+            total_uncertainty (np.ndarray | None): Total uncertainty, shape (n_samples,).
+
+        Returns:
+            pd.DataFrame: Results with 'pred', 'proba_*', and uncertainty columns.
+        """
         pred_res = pd.DataFrame(
             {
                 "pred": ensemble_pred,
@@ -331,12 +355,13 @@ class CVEnsembleClassifierMother(AbstractMotherPipeline, MetaEstimatorMixin, Cla
 
     def _probas_to_preds(self, probas: np.ndarray) -> np.ndarray:
         """
-        Convert class probabilities to predicted class labels.
+        Convert probabilities to class labels by taking argmax.
 
         Args:
-            probas (np.ndarray): Array of class probabilities.
+            probas (np.ndarray): Class probabilities, shape (n_samples, n_classes).
+
         Returns:
-            np.ndarray: Predicted class labels.
+            np.ndarray: Predicted class labels, shape (n_samples,).
         """
         class_indices = np.argmax(probas, axis=1)
         return self.classes_[class_indices]
@@ -389,13 +414,55 @@ class CVEnsembleClassifierMother(AbstractMotherPipeline, MetaEstimatorMixin, Cla
         raise NotImplementedError
 
 
-class CVEnsembleDerivedClassifier(CVEnsembleClassifierMother):
+class EnsembleDerivedUncertaintyClassifier(CVEnsembleClassifierMother):
+    """
+    Ensemble classifier that derives uncertainties from ensemble predictions using mathematical formulas.
+
+    This subclass computes uncertainty estimates directly from the ensemble's aggregated member predictions
+    using methods such as entropy, variance, or disagreement, without requiring pre-computed uncertainties
+    from member estimators.
+
+    Uncertainty Methods
+    -------------------
+    entropy : Computes the entropy of the average predicted probabilities. Provides a full decomposition:
+        total uncertainty = knowledge uncertainty + data uncertainty.
+    variance : Computes the variance of predicted probabilities across estimators (knowledge uncertainty only).
+    disagreement : Computes disagreement using sum of Kullback-Leibler divergences among members
+        (Lakshminarayanan et al., 2017; knowledge uncertainty only).
+
+    See Also
+    --------
+    EnsembleAveragedUncertaintyClassifier : Aggregates pre-computed uncertainties from member estimators.
+    CVEnsembleClassifierMother : Parent class with full interface details.
+
+    Notes
+    -----
+    For full interface details, including attributes, methods, and usage constraints, refer to the
+    parent class `CVEnsembleClassifierMother`.
+    """
+
     def __init__(self, estimators: list):
         super().__init__(estimators=estimators)
 
     def _calculate_uncertainty(
         self, estimator_probas: np.ndarray, uncertainty_method: EnsembleDerivedUncertaintyMethod | str
     ) -> tuple[Optional[np.ndarray], Optional[np.ndarray], Optional[np.ndarray]]:
+        """
+        Calculate uncertainty from ensemble predictions using the specified method.
+
+        Args:
+            estimator_probas (np.ndarray): Member probabilities, shape (n_estimators, n_samples, n_classes).
+            uncertainty_method (EnsembleDerivedUncertaintyMethod | str): Method name:
+                'entropy', 'variance', 'disagreement'.
+
+        Returns:
+            tuple[Optional[np.ndarray], Optional[np.ndarray], Optional[np.ndarray]]:
+                (knowledge_uncertainty, data_uncertainty, total_uncertainty), each shape (n_samples,).
+                data_uncertainty and total_uncertainty may be None depending on method.
+
+        Raises:
+            ValueError: If uncertainty_method is not recognized.
+        """
         try:
             uncertainty_method = EnsembleDerivedUncertaintyMethod(uncertainty_method)
         except (TypeError, ValueError) as e:
@@ -447,22 +514,27 @@ class CVEnsembleDerivedClassifier(CVEnsembleClassifierMother):
         uncertainty_method: str | EnsembleDerivedUncertaintyMethod = EnsembleDerivedUncertaintyMethod.ENTROPY,
     ) -> pd.DataFrame:
         """
-        Predicts ensemble labels, probabilities, and uncertainties for input data X.
+        Predict class labels, probabilities, and uncertainties for input data X.
+
+        Computes ensemble predictions by averaging member probabilities and derives uncertainty estimates
+        from the ensemble predictions using one of three methods:
+
+        - **entropy** (default): Entropy of mean predicted probabilities across estimators with decomposition
+          into knowledge and data uncertainty (total = knowledge + data).
+        - **variance**: Variance of predicted probabilities across estimators (knowledge uncertainty only).
+        - **disagreement**: Sum of Kullback-Leibler divergences among member predictions
+          (Lakshminarayanan et al., 2017; knowledge uncertainty only).
 
         Args:
             X (pd.DataFrame): Input features.
-            uncertainty_for_opt (bool): If True, only return knowledge uncertainty.
-            aggregation_strategy (str): How to combine member predictions. Default is "average".
-            uncertainty_method (str | EnsembleDerivedUncertaintyMethod): Method to estimate uncertainty.
-                Current options are:
-                - "entropy" (default): Computes the entropy of the average predicted probabilities across estimators.
-                    Uncertainty decomposition (total = knowledge + data).
-                - "variance": Computes the variance of predicted probabilities across estimators = knowledge uncertainty
-                - "disagreement": Computes disagreement among estimators using sum of Kullback-Leibler divergences (see
-                    Lakshminarayanan et al., 2017). Knowledge uncertainty only.
+            uncertainty_for_opt (bool): If True, return only knowledge uncertainty. Default is False.
+            aggregation_strategy (str): Strategy to aggregate member probabilities. Default is "average".
+            uncertainty_method (str | EnsembleDerivedUncertaintyMethod): Uncertainty estimation method
+                ('entropy', 'variance', or 'disagreement').
 
         Returns:
-            pd.DataFrame: DataFrame containing predictions and uncertainties.
+            pd.DataFrame: DataFrame with 'pred', 'proba_*', and uncertainty columns. If uncertainty_for_opt=True,
+                only 'knowledge_uncertainty' column is returned.
         """
         estimator_probas = self._collect_member_probas(X)
         knowledge_uncertainty, data_uncertainty, total_uncertainty = self._calculate_uncertainty(
@@ -485,22 +557,48 @@ class CVEnsembleDerivedClassifier(CVEnsembleClassifierMother):
         return pred_res
 
 
-class CVEnsembleAveragingClassifier(CVEnsembleClassifierMother):
+class EnsembleAverageUncertaintyClassifier(CVEnsembleClassifierMother):
+    """
+    Ensemble classifier that aggregates pre-computed uncertainties from member estimators.
+
+    This subclass collects uncertainty estimates already computed by each member estimator and aggregates them
+    (typically by averaging). It preserves the uncertainty decomposition (knowledge, data, total) provided by
+    member models, making it compatible with any estimator that implements `predict_uncertainty`.
+
+    Aggregation Strategy
+    --------------------
+    average : Computes the mean of uncertainties across all ensemble members, maintaining the uncertainty
+        decomposition structure (knowledge, data, total) if available from members.
+
+    See Also
+    --------
+    EnsembleDerivedUncertaintyClassifier : Derives uncertainties from ensemble predictions using mathematical formulas.
+    CVEnsembleClassifierMother : Parent class with full interface details.
+
+    Notes
+    -----
+    For full interface details, including attributes, methods, and usage constraints, refer to the
+    parent class `CVEnsembleClassifierMother`.
+    """
+
     def __init__(self, estimators: list):
         super().__init__(estimators=estimators)
 
     def _collect_member_outputs(self, X: pd.DataFrame, **kwargs) -> tuple[np.ndarray, np.ndarray, list[str]]:
         """
-        Predict probabilities for the input data X and uncertainties for all estimators in the ensemble.
+        Collect probabilities and uncertainties from all ensemble members.
 
         Args:
-            X (pd.DataFrame): DataFrame containing features.
+            X (pd.DataFrame): Input features.
+            **kwargs: Additional arguments passed to each member's `predict_uncertainty`.
 
         Returns:
-            tuple[np.ndarray, np.ndarray, list[str]]: Tuple of array, if predict_uncertainty is True, containing:
-                - Array of predicted probabilities, shape (n_estimators, n_samples, n_classes).
-                - Array of predicted uncertainties, shape (n_estimators, n_samples, n_uncertainty_types).
-                - List of available uncertainty types.
+            tuple[np.ndarray, np.ndarray, list[str]]:
+                (probabilities, uncertainties, available_types) where shapes are
+                (n_estimators, n_samples, n_classes), (n_estimators, n_samples, n_types), and list of type names.
+
+        Raises:
+            ValueError: If members provide inconsistent uncertainty types or no valid uncertainties.
         """
         probas = []
         uncertainties = []
@@ -550,15 +648,18 @@ class CVEnsembleAveragingClassifier(CVEnsembleClassifierMother):
         self, estimator_uncertainties: np.ndarray, available_uncertainties: list[str]
     ) -> tuple[Optional[np.ndarray], Optional[np.ndarray], Optional[np.ndarray]]:
         """
-        Aggregate uncertainties from estimators by averaging.
+        Average uncertainties across all ensemble members.
 
         Args:
-            estimator_uncertainties (np.ndarray): Uncertainties from each estimator.
-                Shape (n_estimators, n_samples, n_types).
-            available_uncertainties (list[str]): Types of uncertainties available.
+            estimator_uncertainties (np.ndarray): Uncertainties from members, shape (n_estimators, n_samples, n_types).
+            available_uncertainties (list[str]): Names of available uncertainty types.
+
         Returns:
-            tuple[np.ndarray, np.ndarray, np.ndarray]: Knowledge, data, and total uncertainties.
-            Each of them can be None, if not in available_uncertainties.
+            tuple[Optional[np.ndarray], Optional[np.ndarray], Optional[np.ndarray]]:
+                (knowledge_uncertainty, data_uncertainty, total_uncertainty), each shape (n_samples,) or None.
+
+        Raises:
+            ValueError: If no uncertainties provided.
         """
         if estimator_uncertainties is not None:
             average_uncertainties = np.mean(estimator_uncertainties, axis=0)  # shape(n_samples, n_available_types)
@@ -580,19 +681,21 @@ class CVEnsembleAveragingClassifier(CVEnsembleClassifierMother):
         self, X: pd.DataFrame, uncertainty_for_opt: bool = False, aggregation_strategy: str = "average", **kwargs
     ) -> pd.DataFrame:
         """
-        Predicts label, probabilities and uncertainties for the input data X.
+        Predict class labels, probabilities, and uncertainties for input data X.
+
+        Collects probabilities and uncertainties from all member estimators, then averages them.
+        Preserves the uncertainty decomposition (knowledge, data, total) provided by members,
+        making this approach compatible with any estimator that implements `predict_uncertainty`.
 
         Args:
             X (pd.DataFrame): Input data.
-            uncertainty_for_opt (bool): If True, return only knowledge uncertainty.
-            aggregation_strategy (str): How to aggregate uncertainties. Default is "average": Computes the average
-            decomposed uncertainty estimated by ensemble members individually, per available uncertainty type in
-            the member prediction. All uncertainty types are considered: knowledge, data, total.
-            **kwargs: Additional arguments for member models.
+            uncertainty_for_opt (bool): If True, return only knowledge uncertainty. Default is False.
+            aggregation_strategy (str): Strategy to aggregate probabilities. Default is "average".
+            **kwargs: Additional arguments passed to each member's `predict_uncertainty` method.
 
         Returns:
-            pd.DataFrame: Predicted with label, probabilities and uncertainties columns.
-
+            pd.DataFrame: DataFrame with 'pred', 'proba_*', and averaged uncertainty columns. If
+                uncertainty_for_opt=True, only 'knowledge_uncertainty' column is returned.
         """
         estimator_probas, estimator_uncertainties, available_uncertainties = self._collect_member_outputs(X, **kwargs)
         ensemble_probas = self._aggregate_probas(estimator_probas, strategy=aggregation_strategy)
