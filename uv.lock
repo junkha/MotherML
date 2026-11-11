@@ -2673,7 +2673,7 @@ wheels = [
 
 [[package]]
 name = "mother-ml"
-version = "2.1.11"
+version = "3.0.0"
 source = { editable = "." }
 dependencies = [
     { name = "boruta" },

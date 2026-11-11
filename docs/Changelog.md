@@ -7,6 +7,217 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- version list -->
 
+## v3.0.0 (2026-11-11)
+
+### Bug Fixes
+
+- **chemeleon**: Validate parameters when they are used, not in __init__
+  ([#71](https://github.com/Bayer-Group/MotherML/pull/71),
+  [`ff8ecf2`](https://github.com/Bayer-Group/MotherML/commit/ff8ecf291e6c09be0b498591f23ac18f529616b0))
+
+- **ci**: Grant pages read permission to docs build job
+  ([`2b027f4`](https://github.com/Bayer-Group/MotherML/commit/2b027f44b08c06cfb59164466449486e03eb40bd))
+
+- **deps**: Cap rdkit below 2026.9 for the chemprop extra
+  ([#71](https://github.com/Bayer-Group/MotherML/pull/71),
+  [`ff8ecf2`](https://github.com/Bayer-Group/MotherML/commit/ff8ecf291e6c09be0b498591f23ac18f529616b0))
+
+- **ml**: Correct NODE and CheMeleon workflows
+  ([#71](https://github.com/Bayer-Group/MotherML/pull/71),
+  [`ff8ecf2`](https://github.com/Bayer-Group/MotherML/commit/ff8ecf291e6c09be0b498591f23ac18f529616b0))
+
+- **node**: Address PR review feedback ([#71](https://github.com/Bayer-Group/MotherML/pull/71),
+  [`ff8ecf2`](https://github.com/Bayer-Group/MotherML/commit/ff8ecf291e6c09be0b498591f23ac18f529616b0))
+
+- **node**: Align uncertainty output with Mother standard and follow sample dtype
+  ([#71](https://github.com/Bayer-Group/MotherML/pull/71),
+  [`ff8ecf2`](https://github.com/Bayer-Group/MotherML/commit/ff8ecf291e6c09be0b498591f23ac18f529616b0))
+
+- **node**: Drop TorchScript from the Entmoid15 activation
+  ([#71](https://github.com/Bayer-Group/MotherML/pull/71),
+  [`ff8ecf2`](https://github.com/Bayer-Group/MotherML/commit/ff8ecf291e6c09be0b498591f23ac18f529616b0))
+
+- **node**: Follow Mother multi-target uncertainty schema and ignore float64 default
+  ([#71](https://github.com/Bayer-Group/MotherML/pull/71),
+  [`ff8ecf2`](https://github.com/Bayer-Group/MotherML/commit/ff8ecf291e6c09be0b498591f23ac18f529616b0))
+
+- **node**: Handle None hidden dimensions in MLP heads
+  ([#71](https://github.com/Bayer-Group/MotherML/pull/71),
+  [`ff8ecf2`](https://github.com/Bayer-Group/MotherML/commit/ff8ecf291e6c09be0b498591f23ac18f529616b0))
+
+- **node**: Harden NODE inputs, params, tuning and uncertainty
+  ([#71](https://github.com/Bayer-Group/MotherML/pull/71),
+  [`ff8ecf2`](https://github.com/Bayer-Group/MotherML/commit/ff8ecf291e6c09be0b498591f23ac18f529616b0))
+
+- **node**: Invalidate initialization cache when loading model state
+  ([#71](https://github.com/Bayer-Group/MotherML/pull/71),
+  [`ff8ecf2`](https://github.com/Bayer-Group/MotherML/commit/ff8ecf291e6c09be0b498591f23ac18f529616b0))
+
+- **node**: Keep encoders on warm start, reject cat_features for arrays, drop dead NODEModel
+  ([#71](https://github.com/Bayer-Group/MotherML/pull/71),
+  [`ff8ecf2`](https://github.com/Bayer-Group/MotherML/commit/ff8ecf291e6c09be0b498591f23ac18f529616b0))
+
+- **node**: Keep the shared NODE base out of model discovery
+  ([#71](https://github.com/Bayer-Group/MotherML/pull/71),
+  [`ff8ecf2`](https://github.com/Bayer-Group/MotherML/commit/ff8ecf291e6c09be0b498591f23ac18f529616b0))
+
+- **node**: Make BALSA-EMD scores batch-independent and accept tuple MLP dims
+  ([#71](https://github.com/Bayer-Group/MotherML/pull/71),
+  [`ff8ecf2`](https://github.com/Bayer-Group/MotherML/commit/ff8ecf291e6c09be0b498591f23ac18f529616b0))
+
+- **node**: Move all shared tensor references to the target device
+  ([#71](https://github.com/Bayer-Group/MotherML/pull/71),
+  [`ff8ecf2`](https://github.com/Bayer-Group/MotherML/commit/ff8ecf291e6c09be0b498591f23ac18f529616b0))
+
+- **node**: Preserve distribution shapes during device traversal
+  ([#71](https://github.com/Bayer-Group/MotherML/pull/71),
+  [`ff8ecf2`](https://github.com/Bayer-Group/MotherML/commit/ff8ecf291e6c09be0b498591f23ac18f529616b0))
+
+- **node**: Preserve ODST output dimensions for higher-rank inputs
+  ([#71](https://github.com/Bayer-Group/MotherML/pull/71),
+  [`ff8ecf2`](https://github.com/Bayer-Group/MotherML/commit/ff8ecf291e6c09be0b498591f23ac18f529616b0))
+
+- **node**: Raise the standard extras error for zuko and speed up init
+  ([#71](https://github.com/Bayer-Group/MotherML/pull/71),
+  [`ff8ecf2`](https://github.com/Bayer-Group/MotherML/commit/ff8ecf291e6c09be0b498591f23ac18f529616b0))
+
+- **node**: Reject boolean dropout rates ([#71](https://github.com/Bayer-Group/MotherML/pull/71),
+  [`ff8ecf2`](https://github.com/Bayer-Group/MotherML/commit/ff8ecf291e6c09be0b498591f23ac18f529616b0))
+
+- **node**: Remove redundant RealNVP flow option
+  ([#71](https://github.com/Bayer-Group/MotherML/pull/71),
+  [`ff8ecf2`](https://github.com/Bayer-Group/MotherML/commit/ff8ecf291e6c09be0b498591f23ac18f529616b0))
+
+- **node**: Repair notebook rendering and refresh tutorial indexes
+  ([#71](https://github.com/Bayer-Group/MotherML/pull/71),
+  [`ff8ecf2`](https://github.com/Bayer-Group/MotherML/commit/ff8ecf291e6c09be0b498591f23ac18f529616b0))
+
+- **node**: Tolerate single-row training batches with batch normalization
+  ([#71](https://github.com/Bayer-Group/MotherML/pull/71),
+  [`ff8ecf2`](https://github.com/Bayer-Group/MotherML/commit/ff8ecf291e6c09be0b498591f23ac18f529616b0))
+
+- **node**: Validate batch_size and follow the default dtype in ODST
+  ([#71](https://github.com/Bayer-Group/MotherML/pull/71),
+  [`ff8ecf2`](https://github.com/Bayer-Group/MotherML/commit/ff8ecf291e6c09be0b498591f23ac18f529616b0))
+
+- **node**: Validate dropout settings and guard uncertainty inference
+  ([#71](https://github.com/Bayer-Group/MotherML/pull/71),
+  [`ff8ecf2`](https://github.com/Bayer-Group/MotherML/commit/ff8ecf291e6c09be0b498591f23ac18f529616b0))
+
+- **node**: Validate inference rows instead of sampler types
+  ([#71](https://github.com/Bayer-Group/MotherML/pull/71),
+  [`ff8ecf2`](https://github.com/Bayer-Group/MotherML/commit/ff8ecf291e6c09be0b498591f23ac18f529616b0))
+
+- **node,chemeleon**: Address PR #71 review comments
+  ([#71](https://github.com/Bayer-Group/MotherML/pull/71),
+  [`ff8ecf2`](https://github.com/Bayer-Group/MotherML/commit/ff8ecf291e6c09be0b498591f23ac18f529616b0))
+
+- **node,chemeleon**: Address review findings in NODE and CheMeleon
+  ([#71](https://github.com/Bayer-Group/MotherML/pull/71),
+  [`ff8ecf2`](https://github.com/Bayer-Group/MotherML/commit/ff8ecf291e6c09be0b498591f23ac18f529616b0))
+
+- **notebook**: Format CheMeleon install cell
+  ([#71](https://github.com/Bayer-Group/MotherML/pull/71),
+  [`ff8ecf2`](https://github.com/Bayer-Group/MotherML/commit/ff8ecf291e6c09be0b498591f23ac18f529616b0))
+
+- **tabpfn**: Disable autocast for pre-fitted embeddings
+  ([#71](https://github.com/Bayer-Group/MotherML/pull/71),
+  [`ff8ecf2`](https://github.com/Bayer-Group/MotherML/commit/ff8ecf291e6c09be0b498591f23ac18f529616b0))
+
+### Build System
+
+- **deps**: Cap rdkit below 2026.9 for every install
+  ([#71](https://github.com/Bayer-Group/MotherML/pull/71),
+  [`ff8ecf2`](https://github.com/Bayer-Group/MotherML/commit/ff8ecf291e6c09be0b498591f23ac18f529616b0))
+
+- **deps**: Require chemprop>=2.2, add real CheMeleon test
+  ([#71](https://github.com/Bayer-Group/MotherML/pull/71),
+  [`ff8ecf2`](https://github.com/Bayer-Group/MotherML/commit/ff8ecf291e6c09be0b498591f23ac18f529616b0))
+
+### Chores
+
+- **ml**: Defer registry prefix fix to PR #91
+  ([#71](https://github.com/Bayer-Group/MotherML/pull/71),
+  [`ff8ecf2`](https://github.com/Bayer-Group/MotherML/commit/ff8ecf291e6c09be0b498591f23ac18f529616b0))
+
+### Continuous Integration
+
+- Run the CheMeleon test in the slow test job
+  ([#71](https://github.com/Bayer-Group/MotherML/pull/71),
+  [`ff8ecf2`](https://github.com/Bayer-Group/MotherML/commit/ff8ecf291e6c09be0b498591f23ac18f529616b0))
+
+### Documentation
+
+- **examples**: Demonstrate CheMeleon embeddings with CatBoost
+  ([#71](https://github.com/Bayer-Group/MotherML/pull/71),
+  [`ff8ecf2`](https://github.com/Bayer-Group/MotherML/commit/ff8ecf291e6c09be0b498591f23ac18f529616b0))
+
+- **examples**: List the CheMeleon quick-start notebook in both indexes
+  ([#71](https://github.com/Bayer-Group/MotherML/pull/71),
+  [`ff8ecf2`](https://github.com/Bayer-Group/MotherML/commit/ff8ecf291e6c09be0b498591f23ac18f529616b0))
+
+- **models**: Document NODE and TabICL model backends
+  ([#71](https://github.com/Bayer-Group/MotherML/pull/71),
+  [`ff8ecf2`](https://github.com/Bayer-Group/MotherML/commit/ff8ecf291e6c09be0b498591f23ac18f529616b0))
+
+- **node**: Clarify BALSA-EMD distributional disagreement
+  ([#71](https://github.com/Bayer-Group/MotherML/pull/71),
+  [`ff8ecf2`](https://github.com/Bayer-Group/MotherML/commit/ff8ecf291e6c09be0b498591f23ac18f529616b0))
+
+- **node**: Fix NODE notebook errors and add missing docstrings
+  ([#71](https://github.com/Bayer-Group/MotherML/pull/71),
+  [`ff8ecf2`](https://github.com/Bayer-Group/MotherML/commit/ff8ecf291e6c09be0b498591f23ac18f529616b0))
+
+### Features
+
+- **chemeleon**: Support configurable embedding output layouts
+  ([#71](https://github.com/Bayer-Group/MotherML/pull/71),
+  [`ff8ecf2`](https://github.com/Bayer-Group/MotherML/commit/ff8ecf291e6c09be0b498591f23ac18f529616b0))
+
+- **node**: Add CheMeleon fingerprints and NODE regression workflows
+  ([#71](https://github.com/Bayer-Group/MotherML/pull/71),
+  [`ff8ecf2`](https://github.com/Bayer-Group/MotherML/commit/ff8ecf291e6c09be0b498591f23ac18f529616b0))
+
+- **node**: Add configurable tree chunk size
+  ([#71](https://github.com/Bayer-Group/MotherML/pull/71),
+  [`ff8ecf2`](https://github.com/Bayer-Group/MotherML/commit/ff8ecf291e6c09be0b498591f23ac18f529616b0))
+
+- **node**: Standardize flow targets and preserve output units
+  ([#71](https://github.com/Bayer-Group/MotherML/pull/71),
+  [`ff8ecf2`](https://github.com/Bayer-Group/MotherML/commit/ff8ecf291e6c09be0b498591f23ac18f529616b0))
+
+- **node**: Standardize regression targets for non-flow heads
+  ([#71](https://github.com/Bayer-Group/MotherML/pull/71),
+  [`ff8ecf2`](https://github.com/Bayer-Group/MotherML/commit/ff8ecf291e6c09be0b498591f23ac18f529616b0))
+
+### Performance Improvements
+
+- **node**: Chunk feature selection and data-aware initialization
+  ([#71](https://github.com/Bayer-Group/MotherML/pull/71),
+  [`ff8ecf2`](https://github.com/Bayer-Group/MotherML/commit/ff8ecf291e6c09be0b498591f23ac18f529616b0))
+
+### Testing
+
+- Add a slow integration test that saves a small real
+  ([#71](https://github.com/Bayer-Group/MotherML/pull/71),
+  [`ff8ecf2`](https://github.com/Bayer-Group/MotherML/commit/ff8ecf291e6c09be0b498591f23ac18f529616b0))
+
+- Exclude only NODE from the generic algorithm sweeps and fix the reason
+  ([#71](https://github.com/Bayer-Group/MotherML/pull/71),
+  [`ff8ecf2`](https://github.com/Bayer-Group/MotherML/commit/ff8ecf291e6c09be0b498591f23ac18f529616b0))
+
+- **ml**: Restore NODE coverage in registry-lookup test
+  ([#71](https://github.com/Bayer-Group/MotherML/pull/71),
+  [`ff8ecf2`](https://github.com/Bayer-Group/MotherML/commit/ff8ecf291e6c09be0b498591f23ac18f529616b0))
+
+- **node**: Silence expected skorch shuffle and requires_grad warnings
+  ([#71](https://github.com/Bayer-Group/MotherML/pull/71),
+  [`ff8ecf2`](https://github.com/Bayer-Group/MotherML/commit/ff8ecf291e6c09be0b498591f23ac18f529616b0))
+
+- **tabpfn**: Align tests with main ([#71](https://github.com/Bayer-Group/MotherML/pull/71),
+  [`ff8ecf2`](https://github.com/Bayer-Group/MotherML/commit/ff8ecf291e6c09be0b498591f23ac18f529616b0))
+
+
 ## v2.1.11 (2026-11-08)
 
 ### Chores
