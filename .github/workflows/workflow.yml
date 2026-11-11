@@ -64,7 +64,9 @@ jobs:
         uses: ./.github/actions/setup-uv-env
         with:
           python-version: ${{ matrix.python-version }}
-          install-args: "--extra rna --extra report --extra tabpfn --extra tabicl --extra clustering --group test_duration"
+          install-args: >-
+            --extra rna --extra report --extra tabpfn --extra tabicl
+            --extra node --extra clustering --group test_duration
 
       - name: Cache HuggingFace and Torch models 🗂️
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -102,6 +104,7 @@ jobs:
       - name: Checkout 🛎
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      # Chemprop's featurizer imports cuik_molmaker, which links against libXrender/libX11/libXext.
       - name: Prepare environment
         run: |
           sudo apt-get update
@@ -111,7 +114,9 @@ jobs:
         uses: ./.github/actions/setup-uv-env
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-          install-args: "--extra rna --extra report --extra tabpfn --extra tabicl --extra clustering --group test_duration"
+          install-args: >-
+            --extra rna --extra report --extra tabpfn --extra tabicl
+            --extra node --extra chemprop --extra clustering --group test_duration
 
       - name: Cache HuggingFace and Torch models 🗂️
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -125,6 +130,10 @@ jobs:
 
       - name: Download TabPFN checkpoint
         run: uv run python scripts/prepareTabpfn.py
+
+      # The CheMeleon test uses importorskip, so a broken install would otherwise show up as a green skip.
+      - name: Check chemprop imports
+        run: uv run python -c "import chemprop; print('chemprop', chemprop.__version__)"
 
       - name: Run slow tests
         run: uv run poe test-slow
