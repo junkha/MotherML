@@ -1082,14 +1082,15 @@ def test_multilabel_and_multitarget_outputs_work_in_mother_cv():
     classifier = NODEClassifier(
         criterion=torch.nn.BCEWithLogitsLoss, model_type="classification_multilabel", **_NODE_CV_PARAMS
     )
-    result = mother_cv(classifier, X=X, y=labels, cv=cv)
+    result = mother_cv(classifier, X=X, y=labels, cv=cv, num_samples=10)
     assert {"pred_target_0_pred", "pred_target_1_pred", "pred_knowledge_uncertainty"} <= set(result.columns)
     assert not any(result[f"pred_target_{i}_pred"].map(lambda v: hasattr(v, "__len__")).any() for i in range(2))
     assert {"pred_proba_l0", "pred_proba_l1"} <= set(result.columns)
 
     targets = pd.DataFrame({"t0": X["a"] * 10 + 100, "t1": X["b"] * 0.1})
     for params in ({"head_type": "linear"}, {"head_type": "flow", "flow_type": "NICE"}):
-        regression = mother_cv(NODERegressor(**params, **_NODE_CV_PARAMS), X=X, y=targets, cv=cv)
+        # Flow heads with dropout scale quadratically with num_samples (mixture entropy over MC passes).
+        regression = mother_cv(NODERegressor(**params, **_NODE_CV_PARAMS), X=X, y=targets, cv=cv, num_samples=10)
         assert {"pred_target_0_pred", "pred_target_1_pred", "pred_target_0_mean_predictions"} <= set(regression.columns)
         assert np.isfinite(regression[["pred_target_0_pred", "pred_target_1_pred"]].to_numpy(dtype=float)).all()
 

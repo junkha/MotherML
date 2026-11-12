@@ -1839,7 +1839,8 @@ def test_predict_uncertainty():
 
     # Test predict_uncertainty
     print("\nTesting predict_uncertainty...")
-    uncertainties = reg_flow.predict_uncertainty(X_test.astype("float32"), num_samples=200)
+    # Mixture-entropy cost grows quadratically with num_samples; 20 samples cover the same code paths.
+    uncertainties = reg_flow.predict_uncertainty(X_test.astype("float32"), num_samples=20)
 
     print(f"  ✓ Uncertainties shape: {uncertainties.shape}")
     print(f"  ✓ Mean total uncertainty: {uncertainties['total_uncertainty'].mean():.4f}")
@@ -1878,7 +1879,7 @@ def test_predict_uncertainty():
     reg_linear.fit(X_train.astype("float32"), y_train.astype("float32"))
 
     # Non-flow heads should now use MC Dropout for uncertainty
-    uncertainties_mc = reg_linear.predict_uncertainty(X_test.astype("float32"), num_samples=50)
+    uncertainties_mc = reg_linear.predict_uncertainty(X_test.astype("float32"), num_samples=20)
     assert all(
         [
             "mean_predictions" in uncertainties_mc.columns,
