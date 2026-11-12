@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- version list -->
 
+## v3.0.2 (2026-11-12)
+
+### Documentation
+
+- **readme**: Update outdated README with current models, extras and uncertainty (#133)
+  ([#134](https://github.com/Bayer-Group/MotherML/pull/134),
+  [`763cb16`](https://github.com/Bayer-Group/MotherML/commit/763cb16893ac8e1891d8a2c34ef5d4c4f84aa0c0))
+
+
 ## v3.0.1 (2026-11-12)
 
 ### Chores
