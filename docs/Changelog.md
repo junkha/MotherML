@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- version list -->
 
+## v3.0.1 (2026-11-12)
+
+### Chores
+
+- **deps**: Bump aiohttp from 3.14.3 to 3.14.4
+  ([#127](https://github.com/Bayer-Group/MotherML/pull/127),
+  [`91a764b`](https://github.com/Bayer-Group/MotherML/commit/91a764bab558fb1df652aadf9ca9ef0aa392ea6d))
+
+
 ## v3.0.0 (2026-11-11)
 
 ### Bug Fixes
