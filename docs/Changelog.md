@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- version list -->
 
+## v3.1.0 (2026-11-12)
+
+### Bug Fixes
+
+- **config**: Default native feature declarations to empty lists
+  ([#114](https://github.com/Bayer-Group/MotherML/pull/114),
+  [`7bec971`](https://github.com/Bayer-Group/MotherML/commit/7bec971458b12b908e5fe86cb1bfcac7589bb521))
+
+- **pipeline**: Preserve integer categorical features during selection
+  ([#114](https://github.com/Bayer-Group/MotherML/pull/114),
+  [`7bec971`](https://github.com/Bayer-Group/MotherML/commit/7bec971458b12b908e5fe86cb1bfcac7589bb521))
+
+### Features
+
+- **catboost**: Support text and embedding feature configuration
+  ([#114](https://github.com/Bayer-Group/MotherML/pull/114),
+  [`7bec971`](https://github.com/Bayer-Group/MotherML/commit/7bec971458b12b908e5fe86cb1bfcac7589bb521))
+
+
 ## v3.0.3 (2026-11-12)
 
 ### Testing
