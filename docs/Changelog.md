@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- version list -->
 
+## v3.0.3 (2026-11-12)
+
+### Testing
+
+- **node**: Reduce uncertainty sample counts in slow NODE tests
+  ([#132](https://github.com/Bayer-Group/MotherML/pull/132),
+  [`24d0b0f`](https://github.com/Bayer-Group/MotherML/commit/24d0b0f51238210e2151615d890e3f8a0493b1b0))
+
+
 ## v3.0.2 (2026-11-12)
 
 ### Documentation
