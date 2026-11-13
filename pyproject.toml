@@ -353,7 +353,7 @@ check-sort-imports = { cmd = "isort . --sg=old --check-only --profile black", he
 check-static-analysis = ["check-lint", "check-types"]
 check-style = ["check-sort-imports", "check-format"]
 check-types = { cmd = "mypy -p src --ignore-missing-imports", help = "check type hint annotations" }
-coverage = { shell = "pytest test -m 'not slow and not serial' -n auto --cov-report xml --cov=mother test --junit-xml=xunit-test.xml", help = "Generate coverage report (xml)" }
+coverage = { shell = "pytest test -m 'not slow and not serial' -n logical --cov-report xml --cov=mother test --junit-xml=xunit-test.xml", help = "Generate coverage report (xml)" }
 dist-test = [
   "build",
   { shell = "cd dist && ../test/test-dist.bash `uv run --with tomli python -c \"import tomli; print('mother_ml-' + tomli.load(open('../pyproject.toml','rb'))['project']['version'] + '-py3-none-any.whl')\"`", help = "check build package in its own environment" },
@@ -370,8 +370,8 @@ serve-coverage = [
 serve-docs = { cmd = "zensical serve", help = "Serve project html documentation" }
 sort-imports = { cmd = "isort . --sg=old --profile black", help = "apply import sort ordering" }
 style = ["sort-imports", "format"]
-test-unit = { shell = "pytest test -m 'not slow and not serial' -n auto && pytest test -m 'serial and not slow' -n 0" }
-test-slow = { shell = "pytest test -m 'slow and serial' -n 0 && pytest test -m 'slow and not serial' -n auto" }
+test-unit = { shell = "pytest test -m 'not slow and not serial' -n logical && pytest test -m 'serial and not slow' -n 0" }
+test-slow = { shell = "pytest test/unit/test_node_unit.py test/unit/test_node_uncertainty.py test/unit/test_node_target_scaling.py -m 'slow' -n 0 && pytest test -m 'slow' -n logical --ignore=test/unit/test_node_unit.py --ignore=test/unit/test_node_uncertainty.py --ignore=test/unit/test_node_target_scaling.py" }
 
 
 [tool.uv.build-backend]

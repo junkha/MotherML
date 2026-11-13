@@ -518,9 +518,11 @@ def feature_selector(
         model_settings["feature_selection_type"] = "permutation"
         model_settings["model_type"] = "regression"
         model_settings["target_type"] = "single_target"
-    return pipeline_utils.get_feature_selection_pipeline(
+    feature_selection_pipeline = pipeline_utils.get_feature_selection_pipeline(
         settings=model_settings, pipeline_settings=pipeline_settings, cv=cv
-    ).set_output(transform="pandas")
+    )
+    feature_selection_pipeline.set_params(feature_selector__importance_selector__estimator__estimator__iterations=50)
+    return feature_selection_pipeline.set_output(transform="pandas")
 
 
 @pytest.fixture()

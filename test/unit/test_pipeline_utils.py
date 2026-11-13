@@ -12,7 +12,7 @@ from scipy.stats import pearsonr
 from sklearn.base import clone
 from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
-from sklearn.model_selection import GroupKFold
+from sklearn.model_selection import GroupKFold, KFold
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
@@ -578,9 +578,14 @@ def test_get_ranking_pipeline(modeling_data, cv_cross_validation, preserve_metad
     pipeline, tuner = get_ranking_pipeline(
         categorical_features=categorical_features,
         k_scorer=3,
+        model_kwargs={"num_trees": 10},
         tuner_kwargs={
             "n_trials_optuna": 3,
         },
+    )
+    pipeline.set_params(
+        feature_selection__feature_selector__importance_selector__estimator__estimator__iterations=50,
+        feature_selection__feature_selector__importance_selector__estimator__cv=KFold(n_splits=2),
     )
 
     # Metadata routing must be enabled for ranking fit and optimize calls.
