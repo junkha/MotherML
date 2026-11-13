@@ -7,6 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- version list -->
 
+## v3.1.1 (2026-11-13)
+
+### Bug Fixes
+
+- **optimization**: Fail loudly on early stopping misconfiguration
+  ([#58](https://github.com/Bayer-Group/MotherML/pull/58),
+  [`30a3fc0`](https://github.com/Bayer-Group/MotherML/commit/30a3fc09cc2efa6d22df43867c686db2abeef01b))
+
+- **optimization**: Guard terminator reporting on usable fold scores
+  ([#58](https://github.com/Bayer-Group/MotherML/pull/58),
+  [`30a3fc0`](https://github.com/Bayer-Group/MotherML/commit/30a3fc09cc2efa6d22df43867c686db2abeef01b))
+
+- **optimization**: Raise when early stopping is requested without torch
+  ([#58](https://github.com/Bayer-Group/MotherML/pull/58),
+  [`30a3fc0`](https://github.com/Bayer-Group/MotherML/commit/30a3fc09cc2efa6d22df43867c686db2abeef01b))
+
+- **optimization**: Support hold-out CV in Optuna tuning
+  ([#58](https://github.com/Bayer-Group/MotherML/pull/58),
+  [`30a3fc0`](https://github.com/Bayer-Group/MotherML/commit/30a3fc09cc2efa6d22df43867c686db2abeef01b))
+
+- **optimization**: Support hold-out CV in Optuna tuning path
+  ([#58](https://github.com/Bayer-Group/MotherML/pull/58),
+  [`30a3fc0`](https://github.com/Bayer-Group/MotherML/commit/30a3fc09cc2efa6d22df43867c686db2abeef01b))
+
+- **tabpfn**: Disable autocast for pre-fitted embeddings
+  ([#58](https://github.com/Bayer-Group/MotherML/pull/58),
+  [`30a3fc0`](https://github.com/Bayer-Group/MotherML/commit/30a3fc09cc2efa6d22df43867c686db2abeef01b))
+
+### Documentation
+
+- **optimization**: Clarify Optuna callback disablement cases
+  ([#58](https://github.com/Bayer-Group/MotherML/pull/58),
+  [`30a3fc0`](https://github.com/Bayer-Group/MotherML/commit/30a3fc09cc2efa6d22df43867c686db2abeef01b))
+
+### Testing
+
+- **tabpfn**: Remove internal autocast assertion
+  ([#58](https://github.com/Bayer-Group/MotherML/pull/58),
+  [`30a3fc0`](https://github.com/Bayer-Group/MotherML/commit/30a3fc09cc2efa6d22df43867c686db2abeef01b))
+
+
 ## v3.1.0 (2026-11-12)
 
 ### Bug Fixes
