@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- version list -->
 
+## v3.1.2 (2026-11-13)
+
+### Continuous Integration
+
+- **tests**: Restore parallel slow tests and fix xdist worker count (#137)
+  ([#144](https://github.com/Bayer-Group/MotherML/pull/144),
+  [`a30a2bb`](https://github.com/Bayer-Group/MotherML/commit/a30a2bbe59bab2962fcbcd97ca6b41b8a716351e))
+
+- **tests**: Run non-NODE slow tests in parallel again, keep NODE serial
+  ([#144](https://github.com/Bayer-Group/MotherML/pull/144),
+  [`a30a2bb`](https://github.com/Bayer-Group/MotherML/commit/a30a2bbe59bab2962fcbcd97ca6b41b8a716351e))
+
+- **tests**: Use logical CPUs for pytest-xdist workers
+  ([#144](https://github.com/Bayer-Group/MotherML/pull/144),
+  [`a30a2bb`](https://github.com/Bayer-Group/MotherML/commit/a30a2bbe59bab2962fcbcd97ca6b41b8a716351e))
+
+### Testing
+
+- **ranking**: Shrink feature-selection models in slow ranking tests
+  ([#144](https://github.com/Bayer-Group/MotherML/pull/144),
+  [`a30a2bb`](https://github.com/Bayer-Group/MotherML/commit/a30a2bbe59bab2962fcbcd97ca6b41b8a716351e))
+
+
 ## v3.1.1 (2026-11-13)
 
 ### Bug Fixes
