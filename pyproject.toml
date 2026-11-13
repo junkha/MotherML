@@ -34,7 +34,8 @@ dependencies = [
   "scipy>=1.11.1,<2",
   "colorama>=0.4.6,<0.5",
   "boruta>=0.4.3,<0.5",
-  "quantile-forest>=1.4.2,<2"
+  "quantile-forest>=1.4.2,<2",
+  "venn-abers>=1.5.4",
 ]
 
 [project.urls]
