@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- version list -->
 
+## v3.1.3 (2026-11-14)
+
+### Chores
+
+- **deps**: Bump tornado from 6.6 to 6.6.1
+  ([#145](https://github.com/Bayer-Group/MotherML/pull/145),
+  [`534c3e9`](https://github.com/Bayer-Group/MotherML/commit/534c3e91350c48580131072a3c2b788bd882a962))
+
+
 ## v3.1.2 (2026-11-13)
 
 ### Continuous Integration
