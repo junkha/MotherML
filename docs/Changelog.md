@@ -7,6 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- version list -->
 
+## v3.2.0 (2026-11-14)
+
+### Bug Fixes
+
+- **catboost**: Expose bootstrap tuning on ranker
+  ([#65](https://github.com/Bayer-Group/MotherML/pull/65),
+  [`55c5703`](https://github.com/Bayer-Group/MotherML/commit/55c57030a7904a9b7799e00061662fad12797b37))
+
+- **catboost**: Expose classifier bootstrap tuning flag
+  ([#65](https://github.com/Bayer-Group/MotherML/pull/65),
+  [`55c5703`](https://github.com/Bayer-Group/MotherML/commit/55c57030a7904a9b7799e00061662fad12797b37))
+
+- **catboost**: Scope bootstrap-level tuning to estimators that use it
+  ([#65](https://github.com/Bayer-Group/MotherML/pull/65),
+  [`55c5703`](https://github.com/Bayer-Group/MotherML/commit/55c57030a7904a9b7799e00061662fad12797b37))
+
+- **tabpfn**: Disable autocast for pre-fitted embedding extraction
+  ([#65](https://github.com/Bayer-Group/MotherML/pull/65),
+  [`55c5703`](https://github.com/Bayer-Group/MotherML/commit/55c57030a7904a9b7799e00061662fad12797b37))
+
+### Code Style
+
+- **catboost**: Reformat bootstrap tuning signatures
+  ([#65](https://github.com/Bayer-Group/MotherML/pull/65),
+  [`55c5703`](https://github.com/Bayer-Group/MotherML/commit/55c57030a7904a9b7799e00061662fad12797b37))
+
+### Features
+
+- **catboost**: Introduce optional bootstrap level tuning
+  ([#65](https://github.com/Bayer-Group/MotherML/pull/65),
+  [`55c5703`](https://github.com/Bayer-Group/MotherML/commit/55c57030a7904a9b7799e00061662fad12797b37))
+
+### Testing
+
+- **catboost**: Cover classifier bootstrap level tuning
+  ([#65](https://github.com/Bayer-Group/MotherML/pull/65),
+  [`55c5703`](https://github.com/Bayer-Group/MotherML/commit/55c57030a7904a9b7799e00061662fad12797b37))
+
+- **catboost**: Verify bootstrap tuning search space distributions
+  ([#65](https://github.com/Bayer-Group/MotherML/pull/65),
+  [`55c5703`](https://github.com/Bayer-Group/MotherML/commit/55c57030a7904a9b7799e00061662fad12797b37))
+
+
 ## v3.1.3 (2026-11-14)
 
 ### Chores
