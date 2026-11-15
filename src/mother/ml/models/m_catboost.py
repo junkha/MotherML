@@ -29,6 +29,7 @@ Mother framework compatibility.
 """
 
 import copy
+import json
 import logging
 import re
 from functools import wraps
@@ -39,6 +40,7 @@ import numpy as np
 import pandas as pd
 from catboost import CatBoostClassifier, CatBoostRanker, CatBoostRegressor
 from optuna.trial import Trial
+from scipy import sparse
 from sklearn import get_config as skl_get_config
 from sklearn import set_config as skl_set_config
 from sklearn.base import BaseEstimator
@@ -782,11 +784,22 @@ class CatboostGaussianProcessRegressorMother(CatBoostRegressor, _CatboostModelMo
     It provides mean predictions and epistemic (knowledge) uncertainty estimates, and
     integrates with the Mother framework for hyperparameter optimization and uncertainty-aware workflows.
 
+    After fitting, the posterior samples are merged into this estimator as a single CatBoost model whose
+    plain prediction is the mean over the samples. Each sample occupies a contiguous range of trees in the
+    merged model; the ranges are stored in the model metadata, so per-sample predictions and the knowledge
+    uncertainty remain available after pickling or ``save_model``/``load_model``.
+
+    Setting the number of threads for fitting is currently not supported. ``sample_gaussian_process`` has no
+    ``thread_count`` argument and trains the posterior samples one after another, each with CatBoost's default
+    of all available cores. A ``thread_count`` passed to this estimator is accepted and stored, but it does not
+    limit the cores used by ``fit``. The prediction methods accept ``thread_count`` as in
+    ``CatBoostRegressor.predict``.
+
     Attributes
     ----------
-    models_ : list
-        List of CatBoost models representing posterior samples (the ensemble).
-    params : dict
+    posterior_tree_ranges_ : list of tuple of int
+        ``(ntree_start, ntree_end)`` of every posterior sample in the merged model.
+    gp_params : dict
         Dictionary of parameters used for sampling and fitting.
 
     Methods
@@ -795,6 +808,8 @@ class CatboostGaussianProcessRegressorMother(CatBoostRegressor, _CatboostModelMo
         Fit the ensemble of CatBoost models using Gaussian Process sampling.
     predict(X)
         Predict mean.
+    predict_posterior_samples(X)
+        Predict with every posterior sample individually.
     predict_uncertainty(X, uncertainty_for_opt=False)
         Estimate mean and uncertainty.
     get_params(deep=True)
@@ -808,6 +823,10 @@ class CatboostGaussianProcessRegressorMother(CatBoostRegressor, _CatboostModelMo
     __setstate__(state)
         Support for unpickling.
     """
+
+    _POSTERIOR_SAMPLES_METADATA_KEY: str = "mother_gp_posterior_samples"
+    # CatBoost's default for iterations; it is not exposed in Python and get_params() omits unset parameters
+    _CATBOOST_DEFAULT_ITERATIONS: int = 1000
 
     def __init__(
         self,
@@ -823,8 +842,8 @@ class CatboostGaussianProcessRegressorMother(CatBoostRegressor, _CatboostModelMo
         verbose: bool = False,
         model_type: str = "regression",
         target_type: props.TargetType = "single_target",
-        **kwargs,
-    ):
+        **kwargs: Any,
+    ) -> None:
         """
         Initialize CatboostGaussianProcessRegressorMother.
 
@@ -832,7 +851,8 @@ class CatboostGaussianProcessRegressorMother(CatBoostRegressor, _CatboostModelMo
             samples : int, default=10
                 Number of posterior samples (ensemble size).
             prior_iterations : int, default=100
-                Number of boosting iterations for prior.
+                Number of boosting iterations for prior. The remaining ``iterations - prior_iterations`` trees
+                (CatBoost's ``iterations``, default 1000) form the posterior part of every sample.
             learning_rate : float, default=0.1
                 Learning rate for boosting.
             max_depth : int, default=6
@@ -861,16 +881,16 @@ class CatboostGaussianProcessRegressorMother(CatBoostRegressor, _CatboostModelMo
             are not accepted here: GP posterior sampling requires a fixed
             ``boosting_type``/``grow_policy``/``loss_function`` and ignores bootstrap levels, so there is nothing for
             them to toggle. They are always ``False`` (see ``get_hyperparameter_space``
-            for the GP-specific hyperparameters that *are* tunable: ``prior_iterations``,
-            ``samples``, ``sigma``, ``delta``, ``eps``, ``random_score_type``).
+            for the GP-specific hyperparameters that *are* tunable: ``learning_rate``, ``prior_iterations``,
+            ``sigma``, ``delta``, ``random_score_type``).
         """
         # GP posterior sampling requires a fixed boosting_type/grow_policy/loss_function,
         # so these tuning flags are always forced off (see get_hyperparameter_space
-        # for the GP-specific hyperparameters that *are* tunable: prior_iterations, samples,
-        # sigma, delta, eps, random_score_type). Reject them here (same as set_params)
+        # for the GP-specific hyperparameters that *are* tunable: learning_rate, prior_iterations,
+        # sigma, delta, random_score_type). Reject them here (same as set_params)
         # instead of silently forwarding them into **kwargs -> CatBoostRegressor, where an
         # unsupported name would only surface as a confusing failure during fit().
-        unsupported_tune_params = {
+        unsupported_tune_params: set[str] = {
             "tune_boosting_type",
             "tune_tree_structure_type",
             "tune_loss_function",
@@ -912,7 +932,7 @@ class CatboostGaussianProcessRegressorMother(CatBoostRegressor, _CatboostModelMo
         self.eps = eps
 
         # Build parameters for CatBoostRegressor initialization
-        catboost_params = {
+        catboost_params: dict[str, Any] = {
             "learning_rate": learning_rate,
             "max_depth": max_depth,
             "random_strength": random_strength,
@@ -923,16 +943,17 @@ class CatboostGaussianProcessRegressorMother(CatBoostRegressor, _CatboostModelMo
         # Add any additional kwargs
         catboost_params.update(kwargs)
 
-        # Add default parameters that aren't already set
+        # Add default parameters that aren't already set; the GP-specific ones are attributes, not CatBoost params
+        gp_only_params: set[str] = {"samples", "prior_iterations", "sigma", "delta", "eps"}
         for key, val in self.default_parameters().items():
-            if key not in catboost_params:
+            if key not in catboost_params and key not in gp_only_params:
                 catboost_params[key] = val
 
         # Initialize CatBoostRegressor properly to ensure _init_params is set
         CatBoostRegressor.__init__(self, **catboost_params)
 
         # Store parameters for GP functionality (used in fit method)
-        self.gp_params = {
+        self.gp_params: dict[str, Any] = {
             "samples": samples,
             "prior_iterations": prior_iterations,
             "learning_rate": learning_rate,
@@ -945,10 +966,7 @@ class CatboostGaussianProcessRegressorMother(CatBoostRegressor, _CatboostModelMo
             "verbose": verbose,
         }
 
-        # Initialize empty models list
-        self.models_ = []
-
-    def get_params(self, deep=True):
+    def get_params(self, deep: bool = True) -> dict:
         """
         Get parameters for this estimator.
 
@@ -959,10 +977,10 @@ class CatboostGaussianProcessRegressorMother(CatBoostRegressor, _CatboostModelMo
             dict: Parameter names mapped to their values.
         """
         # Get base CatBoost parameters
-        base_params = super().get_params(deep=deep)
+        base_params: dict[str, Any] = super().get_params(deep=deep)
 
         # Add our custom parameters
-        custom_params = {
+        custom_params: dict[str, Any] = {
             "model_type": self.model_type,
             "target_type": self.target_type,
             "samples": self.samples,
@@ -976,7 +994,7 @@ class CatboostGaussianProcessRegressorMother(CatBoostRegressor, _CatboostModelMo
         base_params.update(custom_params)
         return base_params
 
-    def set_params(self, **params):
+    def set_params(self, **params: Any) -> "CatboostGaussianProcessRegressorMother":
         """
         Set parameters for this estimator.
 
@@ -987,7 +1005,7 @@ class CatboostGaussianProcessRegressorMother(CatBoostRegressor, _CatboostModelMo
             self
         """
         # Handle our custom parameters
-        custom_param_names = {
+        custom_param_names: set[str] = {
             "model_type",
             "target_type",
             "samples",
@@ -999,12 +1017,12 @@ class CatboostGaussianProcessRegressorMother(CatBoostRegressor, _CatboostModelMo
 
         # tune_boosting_type/tune_tree_structure_type/tune_loss_function are not accepted
         # by this estimator at all (GP posterior sampling requires a fixed boosting_type/
-        # grow_policy/loss_function; other hyperparameters like prior_iterations, samples,
-        # sigma, delta, eps, and random_score_type are still tunable via
+        # grow_policy/loss_function; other hyperparameters like learning_rate, prior_iterations,
+        # sigma, delta, and random_score_type are still tunable via
         # get_hyperparameter_space); reject attempts to set them instead of silently
         # forwarding them to CatBoost's set_params, where an unsupported name would only
         # surface as a confusing failure during fit().
-        unsupported_tune_params = {
+        unsupported_tune_params: set[str] = {
             "tune_boosting_type",
             "tune_tree_structure_type",
             "tune_loss_function",
@@ -1023,9 +1041,11 @@ class CatboostGaussianProcessRegressorMother(CatBoostRegressor, _CatboostModelMo
         # could raise from the parent while leaving self/gp_params partially updated and
         # CatBoost's own parameters untouched -- a later fit() would then silently run
         # with a half-applied update.
-        staged_custom_attrs = {key: params[key] for key in custom_param_names if key in params}
-        staged_gp_params = {key: value for key, value in params.items() if key in self.gp_params}
-        remaining_params = {key: value for key, value in params.items() if key not in custom_param_names}
+        staged_custom_attrs: dict[str, Any] = {key: params[key] for key in custom_param_names if key in params}
+        staged_gp_params: dict[str, Any] = {key: value for key, value in params.items() if key in self.gp_params}
+        remaining_params: dict[str, Any] = {
+            key: value for key, value in params.items() if key not in custom_param_names
+        }
 
         # Let parent handle remaining parameters
         if remaining_params:
@@ -1053,28 +1073,36 @@ class CatboostGaussianProcessRegressorMother(CatBoostRegressor, _CatboostModelMo
         Returns:
             dict: Default parameters.
         """
-        # Use the same defaults as CatboostRegressorMother for consistency
-        base_defaults = {
-            "learning_rate": 0.03,
-            "bootstrap_type": "MVS",
-            "random_strength": 1,
+        # Defaults of catboost.core.sample_gaussian_process for the parameters in get_hyperparameter_space; the
+        # other GP parameters are not listed so that the first tuning trial keeps the values set by the user
+        tunable_defaults: dict[str, Any] = {
+            "learning_rate": 0.1,
+            "prior_iterations": 100,
+            "sigma": 0.1,
+            "delta": 0,
+            "random_score_type": "Gumbel",
+        }
+        # Hardcoded by sample_gaussian_process for every model it trains, so they cannot be tuned
+        fixed_settings: dict[str, Any] = {
+            "bootstrap_type": "No",
             "grow_policy": "SymmetricTree",
             "boosting_type": "Plain",
-            "max_depth": 6,
             "loss_function": "RMSE",
         }
+        base_defaults: dict[str, Any] = {**tunable_defaults, **fixed_settings}
 
         return models_utils.add_prefix_to_dict_keys(base_defaults, prefix=prefix)
 
-    def fit(self, X: pd.DataFrame, y: pd.Series):
+    def fit(self, X: pd.DataFrame, y: pd.Series) -> "CatboostGaussianProcessRegressorMother":
         """
         Fit the CatboostGaussianProcessRegressorMother.
 
         Args:
             X : pd.DataFrame
-                Training data.
+                Training data, also as numpy array or scipy sparse matrix as in CatBoostRegressor. Missing
+                values are handled by CatBoost.
             y : pd.Series
-                Target values.
+                Target values, which must not contain missing values.
 
         Returns:
             self
@@ -1085,15 +1113,31 @@ class CatboostGaussianProcessRegressorMother(CatBoostRegressor, _CatboostModelMo
                 "Multi-target regression is not supported."
             )
 
-        X, y = check_X_y(X, y, accept_sparse=False, ensure_2d=True, dtype=None)
-        posterior_iterations = 1000 - self.prior_iterations
+        # X is only validated: the converted array would drop the DataFrame column names that CatBoost
+        # uses to match prediction columns by name
+        _, y = check_X_y(X, y, accept_sparse=True, ensure_2d=True, dtype=None, ensure_all_finite="allow-nan")
+        if isinstance(X, sparse.spmatrix):
+            # sample_gaussian_process calls len(X), which scipy sparse matrices do not support
+            X = pd.DataFrame.sparse.from_spmatrix(X)
+        elif sparse.issparse(X):
+            raise TypeError(
+                f"{type(X).__name__} is not supported by CatBoost; pass a scipy sparse matrix such as csr_matrix."
+            )
+        params: dict[str, Any] = self.get_params()
+        total_iterations: int = self._total_iterations()
+        posterior_iterations: int = total_iterations - self.prior_iterations
+        if posterior_iterations < 1:
+            raise ValueError(
+                f"prior_iterations ({self.prior_iterations}) must be smaller than the number of iterations "
+                f"({total_iterations}), so that each posterior sample has at least one posterior tree."
+            )
 
         module_logger.warning(
             f"Parameter prior_iterations set to: {self.prior_iterations}, "
             f"automatically updating posterior_iterations to: {posterior_iterations}."
         )
 
-        self.models_ = catboost.core.sample_gaussian_process(
+        posterior_samples: list[CatBoostRegressor] = catboost.core.sample_gaussian_process(
             X=X,
             y=y,
             samples=self.samples,
@@ -1107,10 +1151,70 @@ class CatboostGaussianProcessRegressorMother(CatBoostRegressor, _CatboostModelMo
             random_score_type=self.gp_params["random_score_type"],
             eps=self.eps,
             verbose=self.gp_params["verbose"],
+            random_seed=params.get("random_seed", params.get("random_state")),
+            cat_features=params.get("cat_features"),
+            text_features=params.get("text_features"),
+            embedding_features=params.get("embedding_features"),
         )
+        self._merge_posterior_samples(posterior_samples)
+        # feature_importances_ is a cached attribute, not part of the model; CatBoostRegressor.fit fills it
+        # with this same call as its last step, and load_model leaves it unset
+        self.get_feature_importance(type="PredictionValuesChange")
         return self
 
-    def predict(self, X: pd.DataFrame, **kwargs) -> np.ndarray:
+    def _total_iterations(self) -> int:
+        """Return the number of trees per posterior sample, with the same aliases and default as CatBoost."""
+        params: dict[str, Any] = self.get_params()
+        return next(
+            (params[key] for key in ("iterations", "n_estimators", "num_boost_round", "num_trees") if params.get(key)),
+            self._CATBOOST_DEFAULT_ITERATIONS,
+        )
+
+    def _merge_posterior_samples(self, posterior_samples: list[CatBoostRegressor]) -> None:
+        """
+        Merge the posterior samples into this estimator as a single CatBoost model.
+
+        The merged model is the sum of the samples with weight ``1 / n_samples`` each, so its plain prediction
+        is the posterior mean. The tree range and bias of every sample are taken from the sample itself, so
+        samples with different tree counts (e.g. after early stopping) are reconstructed correctly.
+
+        Args:
+            posterior_samples : list[CatBoostRegressor]
+                Fitted posterior samples as returned by ``catboost.core.sample_gaussian_process``.
+        """
+        if not posterior_samples:
+            raise ValueError("At least one posterior sample is required.")
+
+        tree_ends: np.ndarray = np.cumsum([model.tree_count_ for model in posterior_samples])
+        layout: dict[str, list[Any]] = {
+            "tree_ranges": [
+                [int(end - model.tree_count_), int(end)] for model, end in zip(posterior_samples, tree_ends)
+            ],
+            "biases": [float(model.get_scale_and_bias()[1]) for model in posterior_samples],
+        }
+        weight: float = 1.0 / len(posterior_samples)
+        merged: CatBoostRegressor = catboost.sum_models(posterior_samples, weights=[weight] * len(posterior_samples))
+        self.load_model(blob=merged._serialize_model())
+        self.get_metadata()[self._POSTERIOR_SAMPLES_METADATA_KEY] = json.dumps(layout)
+
+    def _posterior_samples_layout(self) -> dict[str, list[Any]]:
+        """Return the tree ranges and biases of the posterior samples stored in the model metadata."""
+        if not self.is_fitted():
+            raise RuntimeError("Model has not been fitted yet. Call 'fit' first.")
+        layout: Optional[str] = dict(self.get_metadata()).get(self._POSTERIOR_SAMPLES_METADATA_KEY)
+        if layout is None:
+            raise RuntimeError(
+                "The CatBoost model contains no posterior sample layout. "
+                "It was not fitted by CatboostGaussianProcessRegressorMother."
+            )
+        return json.loads(layout)
+
+    @property
+    def posterior_tree_ranges_(self) -> list[tuple[int, int]]:
+        """``(ntree_start, ntree_end)`` of every posterior sample in the merged model."""
+        return [(start, end) for start, end in self._posterior_samples_layout()["tree_ranges"]]
+
+    def predict(self, X: pd.DataFrame, **kwargs: Any) -> np.ndarray:
         """
         Predict regression targets.
 
@@ -1119,20 +1223,65 @@ class CatboostGaussianProcessRegressorMother(CatBoostRegressor, _CatboostModelMo
                 Input data.
             **kwargs
                 Additional keyword arguments passed to CatBoostRegressor.predict().
-                Examples: prediction_type, ntree_start, ntree_end, thread_count, etc.
+                Examples: prediction_type ("RawFormulaVal" or "Exponent"), thread_count, etc.
 
         Returns:
-            np.ndarray: Mean predictions averaged over all ensemble models.
+            np.ndarray: Mean prediction over all posterior samples.
         """
-        if not hasattr(self, "models_") or not self.models_:
+        if not self.is_fitted():
             module_logger.error("Prediction requested before model was fitted. Call 'fit' before 'predict'.")
             raise RuntimeError("Model has not been fitted yet. Call 'fit' before 'predict'.")
 
-        predictions = np.array([model.predict(X, **kwargs) for model in self.models_])
-        mean_predictions = predictions.mean(axis=0)
-        return mean_predictions
+        if kwargs.get("prediction_type", "RawFormulaVal") != "RawFormulaVal":
+            # A non-linear transform of the mean is not the mean of the transformed samples
+            return self.predict_posterior_samples(X, **kwargs).mean(axis=0)
+        return super().predict(X, **kwargs)
 
-    def predict_uncertainty(self, X: pd.DataFrame, uncertainty_for_opt: bool = False, **kwargs) -> pd.DataFrame:
+    def predict_posterior_samples(self, X: pd.DataFrame, **kwargs: Any) -> np.ndarray:
+        """
+        Predict with every posterior sample of the merged model.
+
+        Args:
+            X : pd.DataFrame
+                Input data.
+            **kwargs
+                Additional keyword arguments passed to CatBoostRegressor.predict(), e.g. thread_count.
+                ``prediction_type`` may be "RawFormulaVal" (default) or "Exponent".
+                ``ntree_start`` and ``ntree_end`` are set per sample and cannot be passed.
+
+        Returns:
+            np.ndarray: Predictions of shape ``(n_posterior_samples, n_rows)``.
+        """
+        if not self.is_fitted():
+            raise RuntimeError("Model has not been fitted yet. Call 'fit' before 'predict_posterior_samples'.")
+        if {"ntree_start", "ntree_end"} & kwargs.keys():
+            raise ValueError("ntree_start and ntree_end are set per posterior sample and cannot be passed.")
+        prediction_type: str = kwargs.pop("prediction_type", "RawFormulaVal")
+        if prediction_type not in ("RawFormulaVal", "Exponent"):
+            raise ValueError(
+                f"prediction_type {prediction_type!r} is not supported per posterior sample; "
+                "use 'RawFormulaVal' or 'Exponent'."
+            )
+
+        layout: dict[str, list[Any]] = self._posterior_samples_layout()
+        n_samples: int = len(layout["tree_ranges"])
+        merged_bias: float = self.get_scale_and_bias()[1]
+        predictions: list[np.ndarray] = []
+        for (ntree_start, ntree_end), sample_bias in zip(layout["tree_ranges"], layout["biases"]):
+            # The sample is rebuilt from raw tree values; a transform must be applied afterwards
+            weighted_trees: np.ndarray = super().predict(
+                X, ntree_start=ntree_start, ntree_end=ntree_end, prediction_type="RawFormulaVal", **kwargs
+            )
+            # CatBoost adds the merged model's bias only to tree ranges that start at the first tree
+            if ntree_start == 0:
+                weighted_trees = weighted_trees - merged_bias
+            predictions.append(n_samples * weighted_trees + sample_bias)
+        predictions_array: np.ndarray = np.array(predictions)
+        if prediction_type == "Exponent":
+            return np.exp(predictions_array)
+        return predictions_array
+
+    def predict_uncertainty(self, X: pd.DataFrame, uncertainty_for_opt: bool = False, **kwargs: Any) -> pd.DataFrame:
         """
         Estimate knowledge uncertainty for regression.
 
@@ -1142,21 +1291,21 @@ class CatboostGaussianProcessRegressorMother(CatBoostRegressor, _CatboostModelMo
             uncertainty_for_opt : bool
                 If True, return only uncertainty for optimization.
             **kwargs
-                Additional keyword arguments passed to CatBoostRegressor.predict().
-                Examples: prediction_type, ntree_start, ntree_end, thread_count, etc.
+                Additional keyword arguments passed to CatBoostRegressor.predict(), e.g. thread_count.
 
         Returns:
-            pd.DataFrame: Predictions with uncertainty (knowledge_uncertainty computed as std across models).
+            pd.DataFrame: Predictions with uncertainty (knowledge_uncertainty computed as std across
+                posterior samples).
         """
-        if not hasattr(self, "models_") or not self.models_:
+        if not self.is_fitted():
             raise RuntimeError("Model has not been fitted yet. Call 'fit' before 'predict_uncertainty'.")
 
-        predictions = np.array([model.predict(X, **kwargs) for model in self.models_])
+        predictions: np.ndarray = self.predict_posterior_samples(X, **kwargs)
 
-        mean_predictions = predictions.mean(axis=0)
-        knowledge_uncertainty = predictions.std(axis=0)
+        mean_predictions: np.ndarray = predictions.mean(axis=0)
+        knowledge_uncertainty: np.ndarray = predictions.std(axis=0)
 
-        results = pd.DataFrame(
+        results: pd.DataFrame = pd.DataFrame(
             {
                 "pred": mean_predictions,
                 "mean_predictions": None,
@@ -1175,7 +1324,7 @@ class CatboostGaussianProcessRegressorMother(CatBoostRegressor, _CatboostModelMo
 
         return results
 
-    def get_hyperparameter_space(self, X, y, trial, prefix: str = "") -> dict:
+    def get_hyperparameter_space(self, X: pd.DataFrame, y: pd.Series, trial: Trial, prefix: str = "") -> dict:
         """
         Define the Optuna hyperparameter search space for CatBoost Gaussian Process regression.
 
@@ -1192,31 +1341,35 @@ class CatboostGaussianProcessRegressorMother(CatBoostRegressor, _CatboostModelMo
         Returns:
             dict: Suggested hyperparameters for the current trial.
         """
-        # Get the base hyperparameter space from parent class
-        base_params = super().get_hyperparameter_space(X, y, trial, prefix)
-
-        # Add GP-specific parameters
-        gp_params = {
-            "prior_iterations": trial.suggest_int(prefix + "prior_iterations", 50, 500),
-            "samples": trial.suggest_int(prefix + "samples", 5, 50),
-            "sigma": trial.suggest_float(prefix + "sigma", 1e-3, 0.5, log=True),
-            "delta": trial.suggest_float(prefix + "delta", 0.0, 0.1),
-            "eps": trial.suggest_float(prefix + "eps", 1e-6, 1e-3, log=True),
-            "random_score_type": trial.suggest_categorical(
+        # sample_gaussian_process fixes the tree structure, boosting type, loss function and bootstrapping itself,
+        # so the shared CatBoost space is not used here. Kept as set by the user:
+        # - samples: the Monte Carlo budget, more samples only estimate the same posterior more precisely
+        # - max_depth: currently not tuned; it sets the GP kernel and grows the merged model by 2**max_depth
+        #   leaves per tree
+        # - random_strength: must stay > 0 and, with sigma, sets the shrink rate that CatBoost requires below 1
+        # - eps: a technical precision parameter of the prior
+        max_prior_iterations: int = min(500, self._total_iterations() - 1)
+        suggested_params: dict[str, Any] = {
+            prefix + "learning_rate": trial.suggest_float(prefix + "learning_rate", 0.01, 0.3, log=True),
+            # Stay below the number of trees so that every sample keeps posterior trees
+            prefix + "prior_iterations": trial.suggest_int(
+                prefix + "prior_iterations", min(50, max_prior_iterations), max_prior_iterations
+            ),
+            # Much smaller values make CatBoost's shrink rate exceed 1, larger ones let the prior dominate
+            prefix + "sigma": trial.suggest_float(prefix + "sigma", 0.02, 0.5, log=True),
+            prefix + "delta": trial.suggest_float(prefix + "delta", 0.0, 0.1),
+            prefix + "random_score_type": trial.suggest_categorical(
                 prefix + "random_score_type", ["Gumbel", "NormalWithModelSizeDecrease"]
             ),
         }
 
-        # Merge with base parameters
-        base_params.update(gp_params)
+        module_logger.info(f"Suggested parameters in trial {trial.number}: {suggested_params}")
+        return suggested_params
 
-        module_logger.info(f"Suggested parameters in trial {trial.number}: {base_params}")
-        return base_params
-
-    def __getstate__(self):
+    def __getstate__(self) -> dict:
         """Get state for pickling."""
         # Get state from CatBoostRegressor
-        state = super().__getstate__()
+        state: dict[str, Any] = super().__getstate__()
 
         # Add our custom attributes. The tune_* flags are intentionally *not* included:
         # GP posterior sampling always requires a fixed boosting_type/grow_policy/
@@ -1231,12 +1384,11 @@ class CatboostGaussianProcessRegressorMother(CatBoostRegressor, _CatboostModelMo
                 "delta": self.delta,
                 "eps": self.eps,
                 "gp_params": getattr(self, "gp_params", {}),
-                "models_": getattr(self, "models_", []),
             }
         )
         return state
 
-    def __setstate__(self, state):
+    def __setstate__(self, state: dict) -> None:
         """Set state for unpickling."""
         # Extract our custom attributes
         self.model_type = state.pop("model_type", "regression")
@@ -1252,7 +1404,6 @@ class CatboostGaussianProcessRegressorMother(CatBoostRegressor, _CatboostModelMo
         self.delta = state.pop("delta", 0)
         self.eps = state.pop("eps", 1e-4)
         self.gp_params = state.pop("gp_params", {})
-        self.models_ = state.pop("models_", [])
 
         # Let parent handle the rest
         super().__setstate__(state)
