@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- version list -->
 
+## v3.2.1 (2026-11-15)
+
+### Chores
+
+- **deps-dev**: Bump poethepoet from 0.48.0 to 0.49.0
+  ([#143](https://github.com/Bayer-Group/MotherML/pull/143),
+  [`464a0c6`](https://github.com/Bayer-Group/MotherML/commit/464a0c6564469d99a9a44a0c175de8845620d1a5))
+
+
 ## v3.2.0 (2026-11-14)
 
 ### Bug Fixes
