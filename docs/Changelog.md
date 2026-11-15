@@ -7,6 +7,79 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- version list -->
 
+## v3.3.0 (2026-11-15)
+
+### Bug Fixes
+
+- **catboost**: Apply prediction_type per GP posterior sample
+  ([#136](https://github.com/Bayer-Group/MotherML/pull/136),
+  [`6d54e63`](https://github.com/Bayer-Group/MotherML/commit/6d54e6330d99de5ac8c50829b2e724f23a5d6f43))
+
+### Documentation
+
+- **examples**: Add Gaussian-process CatBoost uncertainty notebook
+  ([#136](https://github.com/Bayer-Group/MotherML/pull/136),
+  [`6d54e63`](https://github.com/Bayer-Group/MotherML/commit/6d54e6330d99de5ac8c50829b2e724f23a5d6f43))
+
+- **examples**: Expand explanation and evaluation in GP CatBoost notebook
+  ([#136](https://github.com/Bayer-Group/MotherML/pull/136),
+  [`6d54e63`](https://github.com/Bayer-Group/MotherML/commit/6d54e6330d99de5ac8c50829b2e724f23a5d6f43))
+
+- **examples**: Replace exact GP comparison with usage guidance in GP CatBoost notebook
+  ([#136](https://github.com/Bayer-Group/MotherML/pull/136),
+  [`6d54e63`](https://github.com/Bayer-Group/MotherML/commit/6d54e6330d99de5ac8c50829b2e724f23a5d6f43))
+
+- **examples**: Use merged posterior samples in GP CatBoost notebook
+  ([#136](https://github.com/Bayer-Group/MotherML/pull/136),
+  [`6d54e63`](https://github.com/Bayer-Group/MotherML/commit/6d54e6330d99de5ac8c50829b2e724f23a5d6f43))
+
+- **GPcatboost**: Improve the gaussian catboost notebook with better examples
+  ([#136](https://github.com/Bayer-Group/MotherML/pull/136),
+  [`6d54e63`](https://github.com/Bayer-Group/MotherML/commit/6d54e6330d99de5ac8c50829b2e724f23a5d6f43))
+
+- **notebook**: Compare CatBoost uncertainties with Spearman, Kendall and Pearson
+  ([#136](https://github.com/Bayer-Group/MotherML/pull/136),
+  [`6d54e63`](https://github.com/Bayer-Group/MotherML/commit/6d54e6330d99de5ac8c50829b2e724f23a5d6f43))
+
+- **notebooks**: Fix the quantile and GP sections of the uncertainty notebook
+  ([#136](https://github.com/Bayer-Group/MotherML/pull/136),
+  [`6d54e63`](https://github.com/Bayer-Group/MotherML/commit/6d54e6330d99de5ac8c50829b2e724f23a5d6f43))
+
+- **notebooks**: Update GP CatBoost notebook to configurable iterations
+  ([#136](https://github.com/Bayer-Group/MotherML/pull/136),
+  [`6d54e63`](https://github.com/Bayer-Group/MotherML/commit/6d54e6330d99de5ac8c50829b2e724f23a5d6f43))
+
+### Features
+
+- **catboost**: Merge GP CatBoost posterior samples into one model via sum_models
+  ([#136](https://github.com/Bayer-Group/MotherML/pull/136),
+  [`6d54e63`](https://github.com/Bayer-Group/MotherML/commit/6d54e6330d99de5ac8c50829b2e724f23a5d6f43))
+
+- **models**: GP CatBoost as a single CatBoostRegressor-compatible model (#125)
+  ([#136](https://github.com/Bayer-Group/MotherML/pull/136),
+  [`6d54e63`](https://github.com/Bayer-Group/MotherML/commit/6d54e6330d99de5ac8c50829b2e724f23a5d6f43))
+
+- **models**: Make GP CatBoost behave like CatBoostRegressor
+  ([#136](https://github.com/Bayer-Group/MotherML/pull/136),
+  [`6d54e63`](https://github.com/Bayer-Group/MotherML/commit/6d54e6330d99de5ac8c50829b2e724f23a5d6f43))
+
+### Refactoring
+
+- **catboost**: Complete GP type hints and move NODE BALSA-EMD section
+  ([#136](https://github.com/Bayer-Group/MotherML/pull/136),
+  [`6d54e63`](https://github.com/Bayer-Group/MotherML/commit/6d54e6330d99de5ac8c50829b2e724f23a5d6f43))
+
+- **catboost**: Drop legacy GP pickle support and document threads
+  ([#136](https://github.com/Bayer-Group/MotherML/pull/136),
+  [`6d54e63`](https://github.com/Bayer-Group/MotherML/commit/6d54e6330d99de5ac8c50829b2e724f23a5d6f43))
+
+### Testing
+
+- **catboost**: Check GP tree ranges through pickle, copy and clone
+  ([#136](https://github.com/Bayer-Group/MotherML/pull/136),
+  [`6d54e63`](https://github.com/Bayer-Group/MotherML/commit/6d54e6330d99de5ac8c50829b2e724f23a5d6f43))
+
+
 ## v3.2.2 (2026-11-15)
 
 ### Chores
