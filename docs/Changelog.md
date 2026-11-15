@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- version list -->
 
+## v3.2.2 (2026-11-15)
+
+### Chores
+
+- **deps-dev**: Bump mypy from 2.4.0 to 2.4.1
+  ([#138](https://github.com/Bayer-Group/MotherML/pull/138),
+  [`8d672c2`](https://github.com/Bayer-Group/MotherML/commit/8d672c2d1c60e1c38037b820bed9acfd7452e40c))
+
+
 ## v3.2.1 (2026-11-15)
 
 ### Chores
