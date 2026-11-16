@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- version list -->
 
+## v3.3.1 (2026-11-16)
+
+### Chores
+
+- **deps**: Bump torch from 2.14.1 to 2.15.0
+  ([#141](https://github.com/Bayer-Group/MotherML/pull/141),
+  [`5aa06fb`](https://github.com/Bayer-Group/MotherML/commit/5aa06fb526980db77edd8d02d87110327a8f9c61))
+
+
 ## v3.3.0 (2026-11-15)
 
 ### Bug Fixes
