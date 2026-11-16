@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- version list -->
 
+## v3.3.2 (2026-11-16)
+
+### Chores
+
+- **deps**: Bump pypa/gh-action-pypi-publish from 1.14.2 to 1.14.3
+  ([#139](https://github.com/Bayer-Group/MotherML/pull/139),
+  [`4e065a8`](https://github.com/Bayer-Group/MotherML/commit/4e065a89b62682d7b28aa85875f83f7f229ec6c0))
+
+
 ## v3.3.1 (2026-11-16)
 
 ### Chores
