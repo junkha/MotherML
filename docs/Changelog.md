@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- version list -->
 
+## v3.3.3 (2026-11-16)
+
+### Documentation
+
+- **examples**: Combine the uncertainty tutorials into one notebook
+  ([#149](https://github.com/Bayer-Group/MotherML/pull/149),
+  [`5a67f6c`](https://github.com/Bayer-Group/MotherML/commit/5a67f6c90a9d64b613f7ed305701b6dcb03e912e))
+
+
 ## v3.3.2 (2026-11-16)
 
 ### Chores
