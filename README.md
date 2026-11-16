@@ -338,6 +338,15 @@ mother_takes_care.mother_cv(
 )
 ```
 
+With `return_estimators=True`, mother_cv can provide all fitted estimator from k-fold cross validation. These can be combined as an ensemble estimator:
+
+```python
+from mother.ml.ensembles.cvEnsemble import EnsembleAverageUncertaintyClassifier
+
+ensemble = EnsembleAverageUncertaintyClassifier(estimators=estimator_list)
+ensemble_prediction = ensemble.predict_uncertainty(X=features)
+```
+
 ### 🚴 Hyperparameter Optimization
 
 The Mother object `MotherTuner` uses optuna to optimize hyperparameters:
