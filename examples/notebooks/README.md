@@ -52,7 +52,7 @@ Dive into sophisticated methods and specialized algorithms:
 |----------|-------------|------------|----------|
 | `01_basic_regression.ipynb` | Standard regression workflow | 🟢 Beginner | 20 min |
 | `02_random_forest_regression.ipynb` | Random Forest for molecular properties | 🟡 Intermediate | 15 min |
-| `03_regression_with_uncertainty.ipynb` | Uncertainty quantification in regression | 🔴 Advanced | 30 min |
+| `03_regression_with_uncertainty.ipynb` | Uncertainty: GP CatBoost, virtual ensembles, RMSEWithUncertainty, MultiQuantile, bootstrap | 🔴 Advanced | 90 min |
 | `04_multitask_random_forest.ipynb` | Multi-task learning with Random Forest | 🔴 Advanced | 30 min |
 | `05_tabicl_regression.ipynb` | Regression using TabICL model with built-in SHAP explainability | 🔴 Advanced | 20 min |
 
