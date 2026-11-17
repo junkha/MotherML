@@ -205,7 +205,8 @@ class TanimotoGroupingFromMols(
             fingerprints, similarity_threshold=self.similarity_threshold
         )
 
-        y: npt.NDArray[np.float64] = np.full((len(list(valid_compounds)), 1), np.nan)
+        # Use fingerprints: GetFingerprints already consumed valid_compounds if it was an iterator.
+        y: npt.NDArray[np.float64] = np.full((len(fingerprints), 1), np.nan)
         for cluster, member in clusters.items():
             y[member, 0] = cluster
 
@@ -245,12 +246,20 @@ class MurckoScaffoldGroupingFromMols(DefaultGrouping):
 
 
 class HdbscanGroupingFromMols(_InstantiateFingerprintGenerator, DefaultGrouping):
-    """A class to perform HDBSCAN clustering on a dataset of chemical compounds"""
+    """HDBSCAN clustering of molecules (or Murcko scaffolds) for group-based CV.
+
+    By default this keeps HDBSCAN's standard labelling: dense clusters get non-negative
+    IDs and all noise points share label ``-1``. That shared outlier group cannot be split
+    by ``GroupKFold``. If you judge that the ``-1`` group is too large for your CV setup,
+    pass ``outliers_as_singletons=True`` yourself so each outlier gets its own group ID;
+    Mother does not switch this automatically.
+    """
 
     def __init__(
         self,
         scaffold: Literal["NoScaffold", "Murcko", "GenericMurcko"] = "NoScaffold",
         min_cluster_size: int = 5,
+        outliers_as_singletons: bool = False,
         radius: int = 2,
         fp_size: int = 2048,
         include_chirality: bool = True,
@@ -266,6 +275,15 @@ class HdbscanGroupingFromMols(_InstantiateFingerprintGenerator, DefaultGrouping)
             - "GenericMurcko": Indicates a generic version of the Murcko scaffold.
         min_cluster_size: int, default = 5
             Integer indicating the smallest size grouping which should be considered a cluster.
+        outliers_as_singletons: bool, default = False
+            How to assign HDBSCAN noise points (label ``-1``). This flag is never flipped
+            automatically; the caller chooses the mode:
+
+            - ``False`` (default): keep standard HDBSCAN behaviour — all outliers share
+              one group ID (``-1``). Preserves previous Mother behaviour (no breaking change).
+            - ``True``: give each outlier a distinct singleton ID (starting after the
+              largest cluster ID). Pass this yourself when the shared ``-1`` group is too
+              large for ``GroupKFold`` and you want outliers free to land in different folds.
         radius: int, default=2
             Radius for the Morgan fingerprint generator.
         fp_size: int, default=2048
@@ -276,9 +294,10 @@ class HdbscanGroupingFromMols(_InstantiateFingerprintGenerator, DefaultGrouping)
         """
 
         super().__init__(radius, fp_size, include_chirality)
-        self.scaffold = scaffold
-        self.min_cluster_size = min_cluster_size
-        self.name = "hdbscan-group"
+        self.scaffold: Literal["NoScaffold", "Murcko", "GenericMurcko"] = scaffold
+        self.min_cluster_size: int = min_cluster_size
+        self.outliers_as_singletons: bool = outliers_as_singletons
+        self.name: str = "hdbscan-group"
 
     def transform(self, valid_compounds: Iterable[chem.Chem.Mol], **kwargs: Any) -> npt.NDArray[np.float64]:
         check_is_fitted(self, "generator")
@@ -295,9 +314,13 @@ class HdbscanGroupingFromMols(_InstantiateFingerprintGenerator, DefaultGrouping)
             fingerprints, min_cluster_size=self.min_cluster_size
         )
 
-        y: npt.NDArray[np.float64] = np.full((len(list(valid_compounds)), 1), np.nan)
+        # Use self.molecules: murcko_scaffold_reduction already consumed valid_compounds.
+        y: npt.NDArray[np.float64] = np.full((len(self.molecules), 1), np.nan)
         for cluster, member in clusters.items():
             y[member, 0] = cluster
+
+        if self.outliers_as_singletons:
+            y = cv_methods.outliers_to_singletons(y)
 
         return y
 
@@ -379,7 +402,8 @@ class KMedoidsGroupingFromMols(_InstantiateFingerprintGenerator, DefaultGrouping
             max_iter=self.max_iter,
         )
 
-        y: npt.NDArray[np.float64] = np.full((len(list(valid_compounds)), 1), np.nan)
+        # Use self.molecules: murcko_scaffold_reduction already consumed valid_compounds.
+        y: npt.NDArray[np.float64] = np.full((len(self.molecules), 1), np.nan)
         for cluster, members in clusters.items():
             y[members, 0] = cluster
 

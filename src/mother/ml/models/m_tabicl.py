@@ -8,12 +8,9 @@ More information on the following repository: https://github.com/soda-inria/tabi
 
 Hyperparameters Tuned by Optuna
 -------------------------------
-The shared tuning logic in _TabICLHyperParams.get_hyperparameter_space suggests:
-
-- n_estimators
-    - Type: int
-    - Range: [1, 12]
-    - Meaning: number of ensemble estimators
+``n_estimators`` is fixed on the model (default 8): more ensemble members
+usually help until cost stops you, so Optuna does not search that knob.
+The shared tuning logic in ``_TabICLHyperParams.get_hyperparameter_space`` suggests:
 
 - softmax_temperature (only if present in model init params, typically classifier)
     - Type: float
@@ -24,6 +21,7 @@ The shared tuning logic in _TabICLHyperParams.get_hyperparameter_space suggests:
     - Type: categorical
     - Values: [True, False]
     - Meaning: average logits before softmax vs average probabilities after softmax
+    - Forced to ``False`` when the model's fixed ``n_estimators == 1``
 
 - outlier_threshold (only if present in model init params, typically regressor)
     - Type: float
@@ -102,14 +100,17 @@ class _TabICLHyperParams(AbstractMotherPipeline):
     def get_hyperparameter_space(self, X, y, trial: Union[Trial, FixedTrial], prefix: str = "") -> dict:
         """Suggest hyperparameters for an Optuna trial.
 
+        ``n_estimators`` is left at the model value (default 8) and is not
+        searched: more ensemble members usually help until inference cost
+        stops you, so burning trials on that range is wasteful.
+
         The set of suggested parameters depends on which keys are present in
         ``_init_params`` (populated from the concrete child class defaults):
 
-        - ``n_estimators`` is always suggested (range [1, 12]).
         - ``softmax_temperature`` is suggested only for classifiers.
         - ``average_logits`` is suggested only for classifiers, and is forced
-          to ``False`` when ``n_estimators == 1`` (averaging is meaningless
-          with a single estimator).
+          to ``False`` when the model's ``n_estimators == 1`` (averaging is
+          meaningless with a single estimator).
         - ``outlier_threshold`` is suggested only for regressors.
 
         All parameter names passed to Optuna are prefixed with ``prefix`` to
@@ -134,9 +135,7 @@ class _TabICLHyperParams(AbstractMotherPipeline):
         dict
             Mapping of prefixed parameter names to sampled values.
         """
-        suggested_params: dict[str, object] = {
-            "n_estimators": trial.suggest_int(prefix + "n_estimators", 1, 12, log=False),
-        }
+        suggested_params: dict[str, object] = {}
 
         # Conditionally suggest parameters based on the model type, inferred from the presence of keys in _init_params
         is_classifier = isinstance(self, TabICLClassifier)
@@ -148,7 +147,7 @@ class _TabICLHyperParams(AbstractMotherPipeline):
             )
 
         if is_classifier and "average_logits" in self._init_params:
-            if suggested_params["n_estimators"] == 1:
+            if getattr(self, "n_estimators", 8) == 1:
                 suggested_params["average_logits"] = False
             else:
                 suggested_params["average_logits"] = trial.suggest_categorical(prefix + "average_logits", (True, False))

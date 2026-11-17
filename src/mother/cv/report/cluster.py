@@ -305,6 +305,87 @@ def visualize_scaffolds(molecules: typing.List[Chem.Mol], max_mols: int = 70):
     return img
 
 
+def _contiguous_runs(labels: np.ndarray) -> list[tuple[float, float, typing.Any]]:
+    """Collapse consecutive equal (non-NaN) labels into (start, width, value) intervals.
+
+    Sample ``i`` occupies ``[i, i + 1)`` so edges sit between samples and align with
+    half-integer group boundary lines.
+    """
+    labels = np.asarray(labels)
+    n = len(labels)
+    if n == 0:
+        return []
+
+    runs: list[tuple[float, float, typing.Any]] = []
+    start = 0
+    current = labels[0]
+
+    def _is_nan(value: typing.Any) -> bool:
+        try:
+            return bool(np.isnan(value))
+        except (TypeError, ValueError):
+            return False
+
+    for i in range(1, n + 1):
+        end_of_run = i == n or _is_nan(labels[i]) != _is_nan(current) or (not _is_nan(current) and labels[i] != current)
+        if end_of_run:
+            if not _is_nan(current):
+                runs.append((float(start), float(i - start), current))
+            if i < n:
+                start = i
+                current = labels[i]
+    return runs
+
+
+def _encode_labels_for_colormap(labels: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Map arbitrary labels to dense integers; also return the unique label values."""
+    labels = np.asarray(labels)
+    uniques, encoded = np.unique(labels, return_inverse=True)
+    return encoded.astype(float), uniques
+
+
+def _categorical_colors(n: int) -> np.ndarray:
+    """Distinct RGBA colors for ``n`` categories (no short-colormap recycling)."""
+    if n <= 0:
+        return np.empty((0, 4))
+    if n == 1:
+        return np.array([plt.colormaps.get_cmap("tab20")(0)])
+    # Evenly spaced hues stay distinguishable for dozens of Tanimoto groups.
+    return plt.colormaps.get_cmap("hsv")(np.linspace(0.0, 0.85, n, endpoint=True))
+
+
+def _draw_label_runs(
+    ax,
+    labels: np.ndarray,
+    y_center: float,
+    height: float,
+    cmap=None,
+    vmin=None,
+    vmax=None,
+    colors: np.ndarray | None = None,
+    edgecolor: str | None = None,
+    linewidth: float = 0.0,
+) -> None:
+    """Draw contiguous horizontal bars for a row of labels."""
+    for start, width, value in _contiguous_runs(labels):
+        value_f = float(value)
+        if colors is not None:
+            color = colors[int(value_f)]
+        elif vmin is not None and vmax is not None:
+            normed = (value_f - vmin) / (vmax - vmin) if vmax != vmin else 0.5
+            color = cmap(normed)
+        else:
+            n_colors = getattr(cmap, "N", 12)
+            color = cmap((value_f % n_colors) / max(n_colors - 1, 1))
+        ax.broken_barh(
+            [(start, width)],
+            (y_center - height / 2.0, height),
+            facecolors=color,
+            edgecolors=edgecolor if edgecolor is not None else "none",
+            linewidths=linewidth,
+        )
+
+
 def plot_cv_indices(cv, X, y, group, n_splits, ax=None, lw=10, **kwargs):
     """
     Create a visualization of cross-validation behavior, showing how data is split into training and test sets.
@@ -318,6 +399,11 @@ def plot_cv_indices(cv, X, y, group, n_splits, ax=None, lw=10, **kwargs):
     - One row per CV split showing training (0) and test (1) sample assignments
     - One row showing the class distribution
     - One row showing the group distribution
+
+    Folds and label rows are drawn as contiguous horizontal intervals (not per-sample
+    scatter markers), so large datasets and TimeSeriesSplit unused regions do not
+    visually overlap. For group-based CV the x-axis is sorted by group so each group
+    is one block and is entirely train or entirely test in every fold.
 
     Parameters
     ----------
@@ -335,11 +421,15 @@ def plot_cv_indices(cv, X, y, group, n_splits, ax=None, lw=10, **kwargs):
     ax : matplotlib.axes.Axes, optional
         The axes upon which to plot the visualization. Default is the current axes.
     lw : float, optional
-        Line width of the samples in the plot. Default is 10.
+        Controls bar height in the plot (legacy name from the scatter-marker API).
+        Default is 10.
     **kwargs : dict, optional
         Additional keyword arguments to pass to matplotlib plotting functions.
         Supported arguments:
         - fontsize: int, size of the title font (default: 15)
+        - title: str, plot title (default: CV class name)
+        - sort_by_group: bool, sort the x-axis by group for group-based CV
+          (default: True). Set False to keep original sample order.
 
     Returns
     -------
@@ -350,53 +440,105 @@ def plot_cv_indices(cv, X, y, group, n_splits, ax=None, lw=10, **kwargs):
     Notes
     -----
     - The CV splits are shown using a coolwarm colormap (blue for training, red for test)
-    - Class and group distributions are shown using the 'Paired' colormap
-    - Each sample's assignment is shown as a horizontal line
+    - Group row uses one distinct color per group (outlined); class uses viridis on ``y``
+    - Contiguous runs of the same assignment share one bar segment
     """
-    # Create axis if none provided
     if ax is None:
         _, ax = plt.subplots()
 
-    # Get colormaps for data and CV splits
-    cmap_data = plt.colormaps.get_cmap("Paired")
+    n_samples = len(X)
+    y_arr = np.asarray(y).reshape(-1)
+    group_arr = np.asarray(group).reshape(-1)
+
+    if len(group_arr) != n_samples:
+        raise ValueError(f"group length ({len(group_arr)}) must match number of samples in X ({n_samples}).")
+    if len(y_arr) != n_samples:
+        raise ValueError(f"y length ({len(y_arr)}) must match number of samples in X ({n_samples}).")
+
     cmap_cv = plt.colormaps.get_cmap("coolwarm")
+    cmap_y = plt.colormaps.get_cmap("viridis")
+    # Bar height in data coordinates; keep visual weight similar to the old lw=10 markers.
+    height = float(np.clip(lw / 15.0, 0.35, 0.85))
 
-    # Check if using group-based CV
     use_groups = "Group" in type(cv).__name__
-    groups = group if use_groups else None
+    groups_for_split = group_arr if use_groups else None
+    sort_by_group = bool(kwargs.get("sort_by_group", use_groups))
 
-    # Generate the training/testing visualizations for each CV split
-    for ii, (tr, tt) in enumerate(cv.split(X=X, y=y, groups=groups)):
-        # Fill in indices with the training/test groups
-        indices = np.array([np.nan] * len(X))
-        indices[tt] = 1
-        indices[tr] = 0
+    # Stable sort by group so each group is one x-block and fold colors stay solid per group.
+    if sort_by_group:
+        order = np.argsort(group_arr, kind="stable")
+    else:
+        order = np.arange(n_samples)
 
-        # Visualize the results
-        ax.scatter(
-            range(len(indices)),
-            [ii + 0.5] * len(indices),
-            c=indices,
-            marker="_",
-            lw=lw,
-            cmap=cmap_cv,
-            vmin=-0.2,
-            vmax=1.2,
-        )
+    group_plot = group_arr[order]
+    y_plot = y_arr[order]
+    # Map original index -> plot column
+    inv_order = np.empty(n_samples, dtype=int)
+    inv_order[order] = np.arange(n_samples)
 
-    # Plot the data classes and groups at the end
-    ax.scatter(range(len(X)), [ii + 1.5] * len(X), c=y, marker="_", lw=lw, cmap=cmap_data)
-    ax.scatter(range(len(X)), [ii + 2.5] * len(X), c=group, marker="_", lw=lw, cmap=cmap_data)
+    ii = -1
+    for ii, (tr, tt) in enumerate(cv.split(X=X, y=y_arr, groups=groups_for_split)):
+        tr = np.asarray(tr, dtype=int)
+        tt = np.asarray(tt, dtype=int)
+        if use_groups:
+            split_groups_train = set(group_arr[tr].tolist())
+            split_groups_test = set(group_arr[tt].tolist())
+            overlap = split_groups_train & split_groups_test
+            if overlap:
+                raise ValueError(
+                    f"{type(cv).__name__} split {ii} places group(s) {sorted(overlap)[:5]} "
+                    "in both train and test; groups were not passed correctly."
+                )
 
-    # Formatting
+        indices = np.full(n_samples, np.nan, dtype=float)
+        indices[inv_order[tt]] = 1.0
+        indices[inv_order[tr]] = 0.0
+        _draw_label_runs(ax, indices, y_center=ii + 0.5, height=height, cmap=cmap_cv, vmin=-0.2, vmax=1.2)
+
+    # Class row: continuous target / labels on a continuous map (avoids one color per float).
+    y_min = float(np.min(y_plot))
+    y_max = float(np.max(y_plot))
+    _draw_label_runs(
+        ax,
+        y_plot.astype(float),
+        y_center=ii + 1.5,
+        height=height,
+        cmap=cmap_y,
+        vmin=y_min,
+        vmax=y_max if y_max != y_min else y_min + 1.0,
+    )
+
+    group_encoded, _ = _encode_labels_for_colormap(group_plot)
+    group_colors = _categorical_colors(int(group_encoded.max()) + 1 if len(group_encoded) else 0)
+    _draw_label_runs(
+        ax,
+        group_encoded,
+        y_center=ii + 2.5,
+        height=height,
+        colors=group_colors,
+        edgecolor="0.2",
+        linewidth=0.4,
+    )
+
+    # Boundaries between consecutive groups on the (possibly sorted) x-axis
+    for i in range(1, n_samples):
+        if group_plot[i] != group_plot[i - 1]:
+            ax.axvline(i - 0.5, color="0.1", lw=0.9, zorder=3)
+
+    ax.grid(False)
+    xlabel = "Sample index (sorted by group)" if sort_by_group else "Sample index"
     yticklabels = list(range(n_splits)) + ["class", "group"]
     ax.set(
         yticks=np.arange(n_splits + 2) + 0.5,
         yticklabels=yticklabels,
-        xlabel="Sample index",
+        xlabel=xlabel,
         ylabel="CV iteration",
         ylim=[n_splits + 2.2, -0.2],
-        xlim=[0, len(X)],
+        xlim=[0, n_samples],
     )
     title = kwargs.get("title", type(cv).__name__)
+    if use_groups:
+        n_groups = len(np.unique(group_arr))
+        title = f"{title}  ({n_groups} groups; each group entirely in train or test)"
     ax.set_title(title, fontsize=kwargs.get("fontsize", 15))
+    return ax

@@ -159,10 +159,57 @@ class TestHdbscan:
         assert groups["hdbscan-group"].isnull().sum() == 0, "Failed to assign compounds to the clusters"
         assert groups["hdbscan-group"].nunique() >= 1, "Unexpected number of clusters"
         assert not groups.empty, "Clustering result is empty"
-
         scaffolds = groups_engine.get_murcko_scaffolds_out()
         assert scaffolds is not None, "Scaffolds attribute is not initialized"
         assert len(scaffolds) == len(test_cases)
+
+
+def test_hdbscan_transform_accepts_iterator(test_cases):
+    """murcko_scaffold_reduction consumes the input; group labels must still match molecule count."""
+    groups_engine = core.HdbscanGroupingFromMols(min_cluster_size=5)
+    groups_engine.fit(test_cases)
+    groups = groups_engine.transform(iter(test_cases))
+    assert groups.shape == (len(test_cases), 1)
+    assert not np.isnan(groups).any()
+
+
+def test_outliers_to_singletons_assigns_unique_ids():
+    labels = np.array([[0.0], [1.0], [-1.0], [-1.0], [1.0], [-1.0]])
+    result = cv_methods.outliers_to_singletons(labels)
+    assert (result != -1).all()
+    assert result[0, 0] == 0.0
+    assert result[1, 0] == 1.0
+    assert result[4, 0] == 1.0
+    singleton_ids = result[[2, 3, 5], 0]
+    assert len(set(singleton_ids.tolist())) == 3
+    assert singleton_ids.min() == 2.0
+
+
+def test_outliers_to_singletons_all_outliers_start_at_zero():
+    labels = np.array([-1, -1, -1], dtype=float)
+    result = cv_methods.outliers_to_singletons(labels)
+    np.testing.assert_array_equal(result, np.array([0.0, 1.0, 2.0]))
+
+
+def test_hdbscan_outliers_as_singletons_toggle(test_cases):
+    default = core.HdbscanGroupingFromMols(min_cluster_size=5)
+    shared = core.HdbscanGroupingFromMols(min_cluster_size=5, outliers_as_singletons=False)
+    unique = core.HdbscanGroupingFromMols(min_cluster_size=5, outliers_as_singletons=True)
+    shared_groups = shared.fit_transform(test_cases).ravel()
+    unique_groups = unique.fit_transform(test_cases).ravel()
+    default_groups = default.fit_transform(test_cases).ravel()
+
+    assert default.outliers_as_singletons is False
+    np.testing.assert_array_equal(default_groups, shared_groups)
+    n_outliers = int((shared_groups == -1).sum())
+    if n_outliers == 0:
+        pytest.skip("HDBSCAN produced no outliers on the test set")
+
+    assert (unique_groups != -1).all()
+    assert len(np.unique(unique_groups)) == len(np.unique(shared_groups)) + n_outliers - 1
+    # Non-outlier labels are unchanged.
+    in_cluster = shared_groups != -1
+    np.testing.assert_array_equal(unique_groups[in_cluster], shared_groups[in_cluster])
 
 
 class TestDefaultGrouping:
@@ -339,6 +386,7 @@ def test_hdbscan_grouping_pickle_clone(test_cases):
         fp_size=2048,
         include_chirality=False,
         min_cluster_size=3,
+        outliers_as_singletons=False,
     )
 
     ## check if pickle/unpickle works
@@ -351,6 +399,7 @@ def test_hdbscan_grouping_pickle_clone(test_cases):
     assert hdbscan_engine.include_chirality == unpickled_engine.include_chirality
     assert hdbscan_engine.scaffold == unpickled_engine.scaffold
     assert hdbscan_engine.min_cluster_size == unpickled_engine.min_cluster_size
+    assert hdbscan_engine.outliers_as_singletons == unpickled_engine.outliers_as_singletons
 
     hdbscan_engine.fit(test_cases)
     unpickled_engine.fit(test_cases)
@@ -367,6 +416,7 @@ def test_hdbscan_grouping_pickle_clone(test_cases):
     assert hdbscan_engine.include_chirality == cloned_model.include_chirality
     assert hdbscan_engine.scaffold == cloned_model.scaffold
     assert hdbscan_engine.min_cluster_size == cloned_model.min_cluster_size
+    assert hdbscan_engine.outliers_as_singletons == cloned_model.outliers_as_singletons
 
     cloned_model.fit(test_cases)
     result_cloned = cloned_model.transform(test_cases)
