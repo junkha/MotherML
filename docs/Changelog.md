@@ -7,6 +7,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- version list -->
 
+## v3.4.0 (2026-11-17)
+
+### Bug Fixes
+
+- **cv**: Draw plot_cv_indices as contiguous bars sorted by group (#50, #51)
+  ([#153](https://github.com/Bayer-Group/MotherML/pull/153),
+  [`6b05096`](https://github.com/Bayer-Group/MotherML/commit/6b050960da858d794e7e98a403a450df47246ba2))
+
+- **cv**: Size group labels from consumed molecules, not exhausted iterators
+  ([#153](https://github.com/Bayer-Group/MotherML/pull/153),
+  [`6b05096`](https://github.com/Bayer-Group/MotherML/commit/6b050960da858d794e7e98a403a450df47246ba2))
+
+- **models**: Leave TabICL n_estimators fixed during Optuna tuning
+  ([#153](https://github.com/Bayer-Group/MotherML/pull/153),
+  [`6b05096`](https://github.com/Bayer-Group/MotherML/commit/6b050960da858d794e7e98a403a450df47246ba2))
+
+### Documentation
+
+- **examples**: Refresh RF and settings notebooks for plot_cv_indices (#50, #51)
+  ([#153](https://github.com/Bayer-Group/MotherML/pull/153),
+  [`6b05096`](https://github.com/Bayer-Group/MotherML/commit/6b050960da858d794e7e98a403a450df47246ba2))
+
+### Features
+
+- **cv**: HDBSCAN outlier singletons, clearer plot_cv_indices, TabICL Optuna space, and NODE CV
+  tests ([#153](https://github.com/Bayer-Group/MotherML/pull/153),
+  [`6b05096`](https://github.com/Bayer-Group/MotherML/commit/6b050960da858d794e7e98a403a450df47246ba2))
+
+- **cv**: Optional HDBSCAN outlier singletons for GroupKFold
+  ([#153](https://github.com/Bayer-Group/MotherML/pull/153),
+  [`6b05096`](https://github.com/Bayer-Group/MotherML/commit/6b050960da858d794e7e98a403a450df47246ba2))
+
+### Testing
+
+- **models**: Cover NODE mother_cv, MotherTuner, and nested CV paths
+  ([#153](https://github.com/Bayer-Group/MotherML/pull/153),
+  [`6b05096`](https://github.com/Bayer-Group/MotherML/commit/6b050960da858d794e7e98a403a450df47246ba2))
+
+
 ## v3.3.3 (2026-11-16)
 
 ### Documentation
