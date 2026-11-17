@@ -7,6 +7,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- version list -->
 
+## v3.5.0 (2026-11-17)
+
+### Bug Fixes
+
+- **cv**: Align plot_cv_indices group lines with group edges
+  ([#151](https://github.com/Bayer-Group/MotherML/pull/151),
+  [`4f5ae56`](https://github.com/Bayer-Group/MotherML/commit/4f5ae560f390663ac1ada53b9b5839d58fe63a1c))
+
+- **cv**: Lazy-import umap in report helpers to avoid TF/torch hang
+  ([#151](https://github.com/Bayer-Group/MotherML/pull/151),
+  [`4f5ae56`](https://github.com/Bayer-Group/MotherML/commit/4f5ae560f390663ac1ada53b9b5839d58fe63a1c))
+
+- **cv**: Skip group boundary lines in plot_cv_indices for many groups
+  ([#151](https://github.com/Bayer-Group/MotherML/pull/151),
+  [`4f5ae56`](https://github.com/Bayer-Group/MotherML/commit/4f5ae560f390663ac1ada53b9b5839d58fe63a1c))
+
+- **models**: Clear stale ARD state and harden Lasso target_type
+  ([#151](https://github.com/Bayer-Group/MotherML/pull/151),
+  [`4f5ae56`](https://github.com/Bayer-Group/MotherML/commit/4f5ae560f390663ac1ada53b9b5839d58fe63a1c))
+
+### Documentation
+
+- **examples**: Fix multitask random forest notebook
+  ([#151](https://github.com/Bayer-Group/MotherML/pull/151),
+  [`4f5ae56`](https://github.com/Bayer-Group/MotherML/commit/4f5ae560f390663ac1ada53b9b5839d58fe63a1c))
+
+- **examples**: Re-run Lasso classification notebook
+  ([#151](https://github.com/Bayer-Group/MotherML/pull/151),
+  [`4f5ae56`](https://github.com/Bayer-Group/MotherML/commit/4f5ae560f390663ac1ada53b9b5839d58fe63a1c))
+
+- **examples**: Run Boruta notebook and fix selection comparison
+  ([#151](https://github.com/Bayer-Group/MotherML/pull/151),
+  [`4f5ae56`](https://github.com/Bayer-Group/MotherML/commit/4f5ae560f390663ac1ada53b9b5839d58fe63a1c))
+
+### Features
+
+- **models**: Keep Lasso target type and backend parameters across get, set and clone
+  ([#151](https://github.com/Bayer-Group/MotherML/pull/151),
+  [`4f5ae56`](https://github.com/Bayer-Group/MotherML/commit/4f5ae560f390663ac1ada53b9b5839d58fe63a1c))
+
+- **models**: Merge Lasso classifiers and add multi-target and ARD modes
+  ([#151](https://github.com/Bayer-Group/MotherML/pull/151),
+  [`4f5ae56`](https://github.com/Bayer-Group/MotherML/commit/4f5ae560f390663ac1ada53b9b5839d58fe63a1c))
+
+- **models**: Merge Lasso classifiers and add multi-target and ARD modes (#124)
+  ([#151](https://github.com/Bayer-Group/MotherML/pull/151),
+  [`4f5ae56`](https://github.com/Bayer-Group/MotherML/commit/4f5ae560f390663ac1ada53b9b5839d58fe63a1c))
+
+
 ## v3.4.0 (2026-11-17)
 
 ### Bug Fixes
