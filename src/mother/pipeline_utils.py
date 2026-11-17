@@ -573,12 +573,15 @@ def get_model(settings: Union[MotherSettings, Dict]) -> ml.AbstractMotherPipelin
                 parameters[parameter] = model_settings[setting]
         estimator = model_class(target_type=model_settings["target_type"], **parameters)
     else:
+        parameters = dict(model_settings["parameters"])
+        if model_settings["algorithm"] == "lasso":
+            parameters.setdefault("target_type", model_settings["target_type"])
         try:
             estimator = ml.get_model_class_by_algorithm_and_type(
                 algorithm=model_settings["algorithm"],
                 model_type=model_settings["model_type"],
             )(
-                **model_settings["parameters"],
+                **parameters,
             )
         except TypeError as e:
             if "__init__() got an unexpected keyword argument" in str(e):

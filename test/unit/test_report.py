@@ -352,6 +352,22 @@ class TestPlotCVIndices:
         assert assign_changes <= group_changes
         plt.close(fig)
 
+    @pytest.mark.parametrize("max_group_boundaries, expected_lines", [(None, 0), (300, 199)])
+    def test_group_boundaries_skipped_for_many_groups(self, max_group_boundaries, expected_lines):
+        n_samples = 400
+        X = rng.random((n_samples, 2))
+        y = rng.integers(0, 2, n_samples)
+        group = np.repeat(np.arange(200), 2)
+        kwargs = {} if max_group_boundaries is None else {"max_group_boundaries": max_group_boundaries}
+
+        fig, ax = plt.subplots()
+        cluster_report.plot_cv_indices(GroupKFold(n_splits=5), X, y, group, 5, ax=ax, **kwargs)
+
+        assert len(ax.lines) == expected_lines
+        assert sorted(line.get_xdata()[0] for line in ax.lines) == list(range(2, 2 * expected_lines + 1, 2))
+        assert "200 groups" in ax.get_title()
+        plt.close(fig)
+
     def test_time_series_split_disjoint_test_and_plot(self):
         """TimeSeriesSplit test folds are disjoint; bars render unused regions cleanly (#51)."""
         n_samples = 200

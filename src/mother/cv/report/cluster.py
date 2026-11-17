@@ -2,7 +2,6 @@ try:
     import ipywidgets as widgets
     import matplotlib.pyplot as plt
     import plotly.express as px
-    import umap
 except ImportError as import_error:
     from mother.errors import ExtrasDependencyImportError
 
@@ -20,6 +19,22 @@ from sklearn.metrics import silhouette_score
 from sklearn.preprocessing import StandardScaler
 
 module_logger = logging.getLogger(__name__)
+
+
+def _import_umap():
+    """Import umap lazily.
+
+    ``umap-learn`` can pull TensorFlow/Keras into the process on some installs. Loading that
+    before Mother's torch-backed model registry (NODE / TabICL / TabPFN) can hang the interpreter,
+    so keep umap off the module import path until a plotting helper actually needs it.
+    """
+    try:
+        import umap
+    except ImportError as import_error:
+        from mother.errors import ExtrasDependencyImportError
+
+        raise ExtrasDependencyImportError("report", import_error) from import_error
+    return umap
 
 
 def update_plot(
@@ -55,7 +70,8 @@ def update_plot(
     scaler: StandardScaler = StandardScaler()
     scaled_features: np.ndarray = scaler.fit_transform(features)
 
-    reducer: umap.UMAP = umap.UMAP(n_neighbors=n_neighbors, min_dist=min_dist, n_components=2)
+    umap = _import_umap()
+    reducer = umap.UMAP(n_neighbors=n_neighbors, min_dist=min_dist, n_components=2)
     embedding = reducer.fit_transform(scaled_features)
 
     umap_df: pd.DataFrame = pd.DataFrame(
@@ -309,7 +325,7 @@ def _contiguous_runs(labels: np.ndarray) -> list[tuple[float, float, typing.Any]
     """Collapse consecutive equal (non-NaN) labels into (start, width, value) intervals.
 
     Sample ``i`` occupies ``[i, i + 1)`` so edges sit between samples and align with
-    half-integer group boundary lines.
+    integer group boundary lines.
     """
     labels = np.asarray(labels)
     n = len(labels)
@@ -430,6 +446,9 @@ def plot_cv_indices(cv, X, y, group, n_splits, ax=None, lw=10, **kwargs):
         - title: str, plot title (default: CV class name)
         - sort_by_group: bool, sort the x-axis by group for group-based CV
           (default: True). Set False to keep original sample order.
+        - max_group_boundaries: int, draw vertical lines between groups only if there
+          are at most this many groups (default: 60). With more groups the lines cover
+          the plot; the outlined group row still separates the groups.
 
     Returns
     -------
@@ -521,9 +540,10 @@ def plot_cv_indices(cv, X, y, group, n_splits, ax=None, lw=10, **kwargs):
     )
 
     # Boundaries between consecutive groups on the (possibly sorted) x-axis
-    for i in range(1, n_samples):
-        if group_plot[i] != group_plot[i - 1]:
-            ax.axvline(i - 0.5, color="0.1", lw=0.9, zorder=3)
+    if len(np.unique(group_arr)) <= kwargs.get("max_group_boundaries", 60):
+        for i in range(1, n_samples):
+            if group_plot[i] != group_plot[i - 1]:
+                ax.axvline(i, color="0.1", lw=0.9, zorder=3)
 
     ax.grid(False)
     xlabel = "Sample index (sorted by group)" if sort_by_group else "Sample index"

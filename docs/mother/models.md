@@ -37,7 +37,7 @@ print(ml.get_supported_models())
 |---|---|
 | `catboost` | `CatboostRegressorMother`, `CatboostGaussianProcessRegressorMother`, `CatboostClassifierMother`, `CatboostRankerMother` |
 | `randomforest` | `RandomForestRegressorMother`, `RandomForestClassifierMother` |
-| `lasso` | `LassoRegressorMother`, `LassoClassifierBinaryMother`, `LassoClassifierMulticlassMother` |
+| `lasso` | `LassoRegressorMother`, `LassoClassifierMother` |
 | `tabpfn` | `TabPFNRegressorMother`, `TabPFNClassifierMother` |
 | `node` | `NODERegressor`, `NODEClassifier` |
 | `tabicl` | `TabICLRegressorMother`, `TabICLClassifierMother` |
