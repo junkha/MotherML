@@ -481,7 +481,8 @@ class EnsembleDerivedUncertaintyClassifier(CVEnsembleClassifierMother):
                 axis=0,
             )  # shape (n_samples,)
 
-            knowledge_uncertainty = total_uncertainty - data_uncertainty
+            knowledge_uncertainty = np.maximum(total_uncertainty - data_uncertainty, 0)  # clamp to 0
+            total_uncertainty = knowledge_uncertainty + data_uncertainty  # rebuild total uncertainty from its parts
         elif uncertainty_method == EnsembleDerivedUncertaintyMethod.VARIANCE:
             # Variance across estimator probas for each sample
             knowledge_uncertainty = np.var(estimator_probas, axis=0).mean(axis=1)  # shape (n_samples,)
