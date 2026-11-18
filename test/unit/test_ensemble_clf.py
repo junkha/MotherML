@@ -4,6 +4,9 @@ import pytest
 import sklearn.base as sk_base
 from scipy.special import rel_entr
 from sklearn.base import BaseEstimator, MetaEstimatorMixin
+from sklearn.datasets import load_iris
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import StratifiedKFold, train_test_split
 from sklearn.pipeline import Pipeline
 
 from mother.ml.core import AbstractMotherPipeline
@@ -13,6 +16,7 @@ from mother.ml.ensembles.cvEnsemble import (
     EnsembleDerivedUncertaintyClassifier,
     EnsembleDerivedUncertaintyMethod,
 )
+from mother.pipeline_utils import mother_cv
 
 AGGREGATION_STRATEGIES = ["average"]
 UNCERTAINTY_METHODS = [
@@ -361,6 +365,71 @@ class TestEnsembleClassifierParameters:
 
 
 class TestEnsembleClassifierPredictions:
+    def test_cv_fitted_classifier_pipelines_on_held_out_data(self):
+        class ForestPipeline(Pipeline, AbstractMotherPipeline):
+            def get_hyperparameter_space(self, X, y, trial, prefix=""):
+                return {}
+
+            def predict_uncertainty(self, X, **kwargs):
+                probabilities = self.predict_proba(X)
+                tree_probabilities = np.stack([tree.predict_proba(np.asarray(X)) for tree in self[-1].estimators_])
+                return pd.DataFrame(
+                    {
+                        "pred": self.classes_[probabilities.argmax(axis=1)],
+                        **{f"proba_{i}": probabilities[:, i] for i in range(len(self.classes_))},
+                        "knowledge_uncertainty": tree_probabilities.var(axis=0).mean(axis=1),
+                    },
+                    index=X.index,
+                )
+
+        features, labels = load_iris(return_X_y=True, as_frame=True)
+        X_train, X_test, y_train, _ = train_test_split(
+            features, labels, test_size=0.2, stratify=labels, random_state=42
+        )
+        pipeline = ForestPipeline([("classifier", RandomForestClassifier(n_estimators=10, random_state=42, n_jobs=1))])
+        _, estimator_dict = mother_cv(
+            pipeline,
+            X=X_train,
+            y=y_train,
+            cv=StratifiedKFold(n_splits=3, shuffle=True, random_state=42),
+            return_estimators=True,
+        )
+        estimators = estimator_dict["estimators"]
+        assert len(estimators) == 3
+        member_probabilities = []
+        for estimator in estimators:
+            probabilities = estimator.predict_proba(X_test)
+            assert isinstance(probabilities, np.ndarray)
+            assert probabilities.shape == (len(X_test), 3)
+            member_probabilities.append(probabilities)
+        expected_probabilities = np.mean(member_probabilities, axis=0)
+
+        for ensemble_type in (EnsembleDerivedUncertaintyClassifier, EnsembleAverageUncertaintyClassifier):
+            ensemble = ensemble_type(estimators)
+            probabilities = ensemble.predict_proba(X_test)
+            assert probabilities.shape == (len(X_test), 3)
+            np.testing.assert_allclose(probabilities, expected_probabilities)
+            np.testing.assert_allclose(probabilities.sum(axis=1), 1)
+
+            result = ensemble.predict_uncertainty(X_test)
+            assert {
+                "pred",
+                "proba_0",
+                "proba_1",
+                "proba_2",
+                "knowledge_uncertainty",
+                "data_uncertainty",
+                "total_uncertainty",
+            }.issubset(result.columns)
+            assert len(result) == len(X_test)
+            pd.testing.assert_index_equal(result.index, X_test.index)
+            np.testing.assert_allclose(result[["proba_0", "proba_1", "proba_2"]], expected_probabilities)
+            np.testing.assert_array_equal(result["pred"], ensemble.classes_[expected_probabilities.argmax(axis=1)])
+            assert np.isfinite(result["knowledge_uncertainty"]).all()
+
+            reordered = ensemble.predict_uncertainty(X_test.iloc[::-1])
+            pd.testing.assert_frame_equal(reordered, result.iloc[::-1])
+
     def test_predict_probas_shape(self, binary_ensemble, binary_probas, X):
         probas = binary_ensemble._collect_member_probas(X)
         assert probas.shape == (2, len(X), 2)
@@ -515,6 +584,95 @@ class TestEnsembleClassifierPredictions:
 
 
 class TestEnsembleClassifierErrorHandling:
+    def test_predict_uncertainty_rejects_member_probability_shape_mismatch(
+        self, binary_probas, knowledge_uncertainties, X
+    ):
+        first_proba, _ = binary_probas
+        first_uncertainty, second_uncertainty = knowledge_uncertainties
+        mismatched_proba = np.array([[0.6, 0.3, 0.1], [0.2, 0.7, 0.1], [0.4, 0.5, 0.1]])
+        ensemble = EnsembleDerivedUncertaintyClassifier(
+            [
+                _FakeClassifier(first_proba, first_uncertainty, [0, 1]),
+                _FakeClassifier(mismatched_proba, second_uncertainty, [0, 1]),
+            ]
+        )
+
+        with pytest.raises(ValueError, match=r"Unexpected shape for member probas"):
+            ensemble.predict_uncertainty(X)
+
+    def test_predict_uncertainty_rejects_invalid_member_probabilities(self, binary_probas, knowledge_uncertainties, X):
+        first_proba, _ = binary_probas
+        first_uncertainty, second_uncertainty = knowledge_uncertainties
+        invalid_proba = np.array([[1.1, -0.1], [0.2, 0.8], [0.3, 0.7]])
+        ensemble = EnsembleDerivedUncertaintyClassifier(
+            [
+                _FakeClassifier(first_proba, first_uncertainty, [0, 1]),
+                _FakeClassifier(invalid_proba, second_uncertainty, [0, 1]),
+            ]
+        )
+
+        with pytest.raises(ValueError, match=r"invalid class probabilities"):
+            ensemble.predict_uncertainty(X)
+
+    def test_averaging_optimization_uncertainty_uses_knowledge_uncertainty(
+        self, binary_probas, knowledge_uncertainties, X
+    ):
+        first_proba, second_proba = binary_probas
+        first_knowledge, second_knowledge = knowledge_uncertainties
+        indexed_X = X.set_axis([10, 20, 30])
+        ensemble = EnsembleAverageUncertaintyClassifier(
+            [
+                _FakeClassifier(first_proba, first_knowledge, [0, 1]),
+                _FakeClassifier(second_proba, second_knowledge, [0, 1]),
+            ]
+        )
+
+        result = ensemble.predict_uncertainty(indexed_X, uncertainty_for_opt=True)
+
+        assert list(result.columns) == ["knowledge_uncertainty"]
+        np.testing.assert_allclose(result["knowledge_uncertainty"], (first_knowledge + second_knowledge) / 2)
+        pd.testing.assert_index_equal(result.index, indexed_X.index)
+
+    def test_averaging_optimization_uncertainty_falls_back_to_total(self, binary_probas, X):
+        first_proba, second_proba = binary_probas
+        first_total = np.array([0.3, 0.5, 0.7])
+        second_total = np.array([0.5, 0.7, 0.9])
+        indexed_X = X.set_axis([10, 20, 30])
+        ensemble = EnsembleAverageUncertaintyClassifier(
+            [
+                _FakeClassifier(first_proba, np.full(3, np.nan), [0, 1], total_uncertainties=first_total),
+                _FakeClassifier(second_proba, np.full(3, np.nan), [0, 1], total_uncertainties=second_total),
+            ]
+        )
+
+        result = ensemble.predict_uncertainty(indexed_X, uncertainty_for_opt=True)
+
+        assert list(result.columns) == ["total_uncertainty"]
+        np.testing.assert_allclose(result["total_uncertainty"], (first_total + second_total) / 2)
+        pd.testing.assert_index_equal(result.index, indexed_X.index)
+
+    def test_averaging_optimization_uncertainty_rejects_data_only_members(self, binary_probas, X):
+        first_proba, second_proba = binary_probas
+        ensemble = EnsembleAverageUncertaintyClassifier(
+            [
+                _FakeClassifier(
+                    first_proba,
+                    np.full(3, np.nan),
+                    [0, 1],
+                    data_uncertainties=np.array([0.1, 0.2, 0.3]),
+                ),
+                _FakeClassifier(
+                    second_proba,
+                    np.full(3, np.nan),
+                    [0, 1],
+                    data_uncertainties=np.array([0.3, 0.4, 0.5]),
+                ),
+            ]
+        )
+
+        with pytest.raises(ValueError):
+            ensemble.predict_uncertainty(X, uncertainty_for_opt=True)
+
     def test_empty_uncertainty_raises(self, binary_probas, knowledge_uncertainties, X):
         first, second = binary_probas
         ensemble = EnsembleAverageUncertaintyClassifier(
