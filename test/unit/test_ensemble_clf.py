@@ -1,3 +1,5 @@
+import pickle
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -289,6 +291,31 @@ class TestEnsembleClassifierInitialization:
 
 
 class TestSklearnCompatibility:
+
+    def test_pickle_round_trip_preserves_fitted_state(self, binary_ensemble, X, tmp_path):
+        expected_proba = binary_ensemble.predict_proba(X)
+        expected_pred = binary_ensemble.predict(X)
+        expected_uncertainty = binary_ensemble.predict_uncertainty(X)
+        model_path = tmp_path / "ensemble.pkl"
+
+        with model_path.open("wb") as model_file:
+            pickle.dump(binary_ensemble, model_file)
+        with model_path.open("rb") as model_file:
+            restored = pickle.load(model_file)
+
+        assert restored is not binary_ensemble
+        assert type(restored) is type(binary_ensemble)
+        np.testing.assert_array_equal(restored.classes_, binary_ensemble.classes_)
+        assert len(restored.estimators) == len(binary_ensemble.estimators)
+        for original, loaded in zip(binary_ensemble.estimators, restored.estimators):
+            assert type(loaded) is type(original)
+            assert loaded.get_params() == original.get_params()
+            np.testing.assert_array_equal(loaded.classes_, original.classes_)
+
+        np.testing.assert_array_equal(restored.predict_proba(X), expected_proba)
+        np.testing.assert_array_equal(restored.predict(X), expected_pred)
+        pd.testing.assert_frame_equal(restored.predict_uncertainty(X), expected_uncertainty)
+
     def test_cloning_preserves_fitted_state(self, binary_ensemble, X):
         clone = sk_base.clone(binary_ensemble)
         assert clone is not binary_ensemble
