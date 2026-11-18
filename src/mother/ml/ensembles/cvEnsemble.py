@@ -290,10 +290,8 @@ class CVEnsembleClassifierMother(AbstractMotherPipeline, MetaEstimatorMixin, Cla
         Raises:
             ValueError: If probabilities are invalid (NaN, out of [0, 1], or don't sum to 1).
         """
-        proba_columns = [f"proba_{i}" for i in range(len(self.classes_))]
-
         member_probas = (
-            prediction.loc[:, proba_columns].to_numpy(dtype=float)
+            prediction.filter(like="proba_").to_numpy(dtype=float)
             if isinstance(prediction, pd.DataFrame)
             else np.asarray(prediction, dtype=float)
         )
