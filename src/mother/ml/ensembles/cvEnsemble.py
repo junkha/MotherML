@@ -296,13 +296,10 @@ class CVEnsembleClassifierMother(AbstractMotherPipeline, MetaEstimatorMixin, Cla
             else np.asarray(prediction, dtype=float)
         )
 
-        if member_probas.shape[1] != len(self.classes_):
+        if member_probas.ndim != 2 or member_probas.shape[1] != len(self.classes_):
             raise ValueError(
-                "Unexpected shape for member probas. Got "
-                + str(member_probas.shape)
-                + "probability columns; expected probabilities for"
-                + str(len(self.classes_))
-                + "classes."
+                f"Unexpected shape for member probas: got {member_probas.shape}; "
+                f"expected (n_samples, {len(self.classes_)}) for {len(self.classes_)} classes."
             )
 
         if (
