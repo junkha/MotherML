@@ -202,6 +202,28 @@ def test_get_model_raises_invalid_parameters(settings: MotherSettings) -> None:
         get_model(settings)
 
 
+@pytest.mark.parametrize("target_type", ["single_target", "multi_target"])
+def test_get_model_passes_target_type_to_lasso_regressor(settings: MotherSettings, target_type: str) -> None:
+    settings.model.algorithm = "lasso"
+    settings.model.model_type = "regression"  # type: ignore
+    settings.model.target_type = target_type  # type: ignore
+    settings.model.parameters = {}
+    assert get_model(settings).target_type == target_type
+
+
+@pytest.mark.parametrize("model_type", ["classification_binary", "classification_multiclass"])
+def test_get_model_passes_single_target_to_lasso_classifier(settings: MotherSettings, model_type: str) -> None:
+    settings.model.algorithm = "lasso"
+    settings.model.model_type = model_type  # type: ignore
+    settings.model.target_type = "single_target"  # type: ignore
+    settings.model.parameters = {}
+    assert get_model(settings).target_type == "single_target"
+
+    settings.model.target_type = "multi_target"  # type: ignore
+    with pytest.raises(ValueError, match="must be 'single_target'"):
+        get_model(settings)
+
+
 @pytest.mark.parametrize("clear_categorical_features", [False, True])
 def test_default_settings_numeric_pipeline_fit(clear_categorical_features: bool) -> None:
     settings = MotherSettings.create()

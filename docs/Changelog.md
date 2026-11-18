@@ -7,6 +7,94 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- version list -->
 
+## v3.5.0 (2026-11-17)
+
+### Bug Fixes
+
+- **cv**: Align plot_cv_indices group lines with group edges
+  ([#151](https://github.com/Bayer-Group/MotherML/pull/151),
+  [`4f5ae56`](https://github.com/Bayer-Group/MotherML/commit/4f5ae560f390663ac1ada53b9b5839d58fe63a1c))
+
+- **cv**: Lazy-import umap in report helpers to avoid TF/torch hang
+  ([#151](https://github.com/Bayer-Group/MotherML/pull/151),
+  [`4f5ae56`](https://github.com/Bayer-Group/MotherML/commit/4f5ae560f390663ac1ada53b9b5839d58fe63a1c))
+
+- **cv**: Skip group boundary lines in plot_cv_indices for many groups
+  ([#151](https://github.com/Bayer-Group/MotherML/pull/151),
+  [`4f5ae56`](https://github.com/Bayer-Group/MotherML/commit/4f5ae560f390663ac1ada53b9b5839d58fe63a1c))
+
+- **models**: Clear stale ARD state and harden Lasso target_type
+  ([#151](https://github.com/Bayer-Group/MotherML/pull/151),
+  [`4f5ae56`](https://github.com/Bayer-Group/MotherML/commit/4f5ae560f390663ac1ada53b9b5839d58fe63a1c))
+
+### Documentation
+
+- **examples**: Fix multitask random forest notebook
+  ([#151](https://github.com/Bayer-Group/MotherML/pull/151),
+  [`4f5ae56`](https://github.com/Bayer-Group/MotherML/commit/4f5ae560f390663ac1ada53b9b5839d58fe63a1c))
+
+- **examples**: Re-run Lasso classification notebook
+  ([#151](https://github.com/Bayer-Group/MotherML/pull/151),
+  [`4f5ae56`](https://github.com/Bayer-Group/MotherML/commit/4f5ae560f390663ac1ada53b9b5839d58fe63a1c))
+
+- **examples**: Run Boruta notebook and fix selection comparison
+  ([#151](https://github.com/Bayer-Group/MotherML/pull/151),
+  [`4f5ae56`](https://github.com/Bayer-Group/MotherML/commit/4f5ae560f390663ac1ada53b9b5839d58fe63a1c))
+
+### Features
+
+- **models**: Keep Lasso target type and backend parameters across get, set and clone
+  ([#151](https://github.com/Bayer-Group/MotherML/pull/151),
+  [`4f5ae56`](https://github.com/Bayer-Group/MotherML/commit/4f5ae560f390663ac1ada53b9b5839d58fe63a1c))
+
+- **models**: Merge Lasso classifiers and add multi-target and ARD modes
+  ([#151](https://github.com/Bayer-Group/MotherML/pull/151),
+  [`4f5ae56`](https://github.com/Bayer-Group/MotherML/commit/4f5ae560f390663ac1ada53b9b5839d58fe63a1c))
+
+- **models**: Merge Lasso classifiers and add multi-target and ARD modes (#124)
+  ([#151](https://github.com/Bayer-Group/MotherML/pull/151),
+  [`4f5ae56`](https://github.com/Bayer-Group/MotherML/commit/4f5ae560f390663ac1ada53b9b5839d58fe63a1c))
+
+
+## v3.4.0 (2026-11-17)
+
+### Bug Fixes
+
+- **cv**: Draw plot_cv_indices as contiguous bars sorted by group (#50, #51)
+  ([#153](https://github.com/Bayer-Group/MotherML/pull/153),
+  [`6b05096`](https://github.com/Bayer-Group/MotherML/commit/6b050960da858d794e7e98a403a450df47246ba2))
+
+- **cv**: Size group labels from consumed molecules, not exhausted iterators
+  ([#153](https://github.com/Bayer-Group/MotherML/pull/153),
+  [`6b05096`](https://github.com/Bayer-Group/MotherML/commit/6b050960da858d794e7e98a403a450df47246ba2))
+
+- **models**: Leave TabICL n_estimators fixed during Optuna tuning
+  ([#153](https://github.com/Bayer-Group/MotherML/pull/153),
+  [`6b05096`](https://github.com/Bayer-Group/MotherML/commit/6b050960da858d794e7e98a403a450df47246ba2))
+
+### Documentation
+
+- **examples**: Refresh RF and settings notebooks for plot_cv_indices (#50, #51)
+  ([#153](https://github.com/Bayer-Group/MotherML/pull/153),
+  [`6b05096`](https://github.com/Bayer-Group/MotherML/commit/6b050960da858d794e7e98a403a450df47246ba2))
+
+### Features
+
+- **cv**: HDBSCAN outlier singletons, clearer plot_cv_indices, TabICL Optuna space, and NODE CV
+  tests ([#153](https://github.com/Bayer-Group/MotherML/pull/153),
+  [`6b05096`](https://github.com/Bayer-Group/MotherML/commit/6b050960da858d794e7e98a403a450df47246ba2))
+
+- **cv**: Optional HDBSCAN outlier singletons for GroupKFold
+  ([#153](https://github.com/Bayer-Group/MotherML/pull/153),
+  [`6b05096`](https://github.com/Bayer-Group/MotherML/commit/6b050960da858d794e7e98a403a450df47246ba2))
+
+### Testing
+
+- **models**: Cover NODE mother_cv, MotherTuner, and nested CV paths
+  ([#153](https://github.com/Bayer-Group/MotherML/pull/153),
+  [`6b05096`](https://github.com/Bayer-Group/MotherML/commit/6b050960da858d794e7e98a403a450df47246ba2))
+
+
 ## v3.3.3 (2026-11-16)
 
 ### Documentation

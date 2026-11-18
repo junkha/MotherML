@@ -121,6 +121,33 @@ def _assign_points_to_clusters(
     return clusters
 
 
+def outliers_to_singletons(hdbscan_groups: np.ndarray) -> np.ndarray:
+    """
+    Convert HDBSCAN outlier labels (``-1``) into distinct singleton group IDs.
+
+    Clustered labels are left unchanged. Each former outlier gets a unique ID starting at
+    ``max(groups) + 1`` (or ``0`` when every label is ``-1``).
+
+    Parameters
+    ----------
+    hdbscan_groups : np.ndarray
+        Array of cluster labels (any shape). Values of ``-1`` are treated as outliers.
+
+    Returns
+    -------
+    np.ndarray
+        Copy of ``hdbscan_groups`` with outliers replaced by unique singleton IDs.
+    """
+    groups: np.ndarray = np.array(hdbscan_groups, copy=True, dtype=float)
+    flat: np.ndarray = groups.ravel()
+    outlier_mask: np.ndarray = flat == -1
+    if bool(outlier_mask.any()):
+        start_id: int = int(flat.max()) + 1
+        n_outliers: int = int(outlier_mask.sum())
+        flat[outlier_mask] = np.arange(start_id, start_id + n_outliers)
+    return groups
+
+
 def hdbscan_clustering(
     fingerprints: Union[np.ndarray, List[DataStructs.ExplicitBitVect], tuple[DataStructs.ExplicitBitVect]],
     min_cluster_size: int = 5,

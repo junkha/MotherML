@@ -120,11 +120,11 @@ class TestTabICLRegression:
         assert output["total_uncertainty"].equals(output_opt)
 
     def test_hyperparameter_space_regressor(self):
-        trial = FixedTrial({"reg__n_estimators": 5, "reg__outlier_threshold": 3.2})
+        trial = FixedTrial({"reg__outlier_threshold": 3.2})
         space = self.model.get_hyperparameter_space(self.X_train, self.y_train, trial, prefix="reg__")
 
-        assert space["reg__n_estimators"] == 5
-        assert space["reg__outlier_threshold"] == 3.2
+        assert space == {"reg__outlier_threshold": 3.2}
+        assert "reg__n_estimators" not in space
         assert "reg__softmax_temperature" not in space
         assert "reg__average_logits" not in space
 
@@ -217,26 +217,27 @@ class TestTabICLClassification:
         assert np.all(np.isfinite(predictions))
 
     def test_hyperparameter_space_classifier(self):
-        trial = FixedTrial(
-            {
-                "clf__n_estimators": 4,
-                "clf__softmax_temperature": 1.1,
-                "clf__average_logits": True,
-                "clf__outlier_threshold": 3.0,
-            }
-        )
+        # Fixture uses n_estimators=1, so average_logits is forced off (not searched).
+        trial = FixedTrial({"clf__softmax_temperature": 1.1, "clf__outlier_threshold": 3.0})
         space = self.model.get_hyperparameter_space(self.X_train, self.y_train, trial, prefix="clf__")
 
-        assert space["clf__n_estimators"] == 4
-        assert space["clf__softmax_temperature"] == 1.1
-        assert space["clf__average_logits"] is True
+        assert space == {"clf__softmax_temperature": 1.1, "clf__average_logits": False}
+        assert "clf__n_estimators" not in space
 
     def test_hyperparameter_space_forces_average_logits_with_one_estimator(self):
-        trial = FixedTrial({"clf__n_estimators": 1, "clf__softmax_temperature": 0.8, "clf__outlier_threshold": 3.0})
+        trial = FixedTrial({"clf__softmax_temperature": 0.8})
         space = self.model.get_hyperparameter_space(self.X_train, self.y_train, trial, prefix="clf__")
 
-        assert space["clf__n_estimators"] == 1
+        assert "clf__n_estimators" not in space
         assert space["clf__average_logits"] is False
+
+    def test_hyperparameter_space_tunes_average_logits_with_several_estimators(self):
+        model = TabICLClassifierMother(n_estimators=8)
+        trial = FixedTrial({"clf__softmax_temperature": 1.0, "clf__average_logits": True})
+        space = model.get_hyperparameter_space(self.X_train, self.y_train, trial, prefix="clf__")
+
+        assert space == {"clf__softmax_temperature": 1.0, "clf__average_logits": True}
+        assert "clf__n_estimators" not in space
 
     def test_set_params_after_fit_does_not_change(self):
         model = TabICLClassifierMother(n_estimators=1)

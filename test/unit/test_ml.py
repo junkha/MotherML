@@ -44,9 +44,9 @@ def all_classification_algorithms(request):
 
         model = TabICLClassifierMother()
     elif algorithm == "lasso":
-        from mother.ml.models.m_lasso import LassoClassifierBinaryMother
+        from mother.ml.models.m_lasso import LassoClassifierMother
 
-        model = LassoClassifierBinaryMother()
+        model = LassoClassifierMother()
     else:
         assert algorithm == "catboost"
     return model

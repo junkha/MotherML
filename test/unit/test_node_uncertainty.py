@@ -1118,3 +1118,278 @@ def test_classifier_probability_columns_are_positional_in_mother_cv(negative, po
     assert set(result["pred_y"]) <= {negative, positive}
     probabilities = result[["pred_proba_0", "pred_proba_1"]].to_numpy()
     assert (result["pred_y"].to_numpy() == ordered[probabilities.argmax(axis=1)]).all()
+
+
+# Tiny NODE settings for nested CV (outer folds × Optuna trials × inner folds).
+_NODE_NESTED_PARAMS = dict(num_trees=4, depth=2, max_epochs=1, device="cpu", verbose=0)
+
+
+def test_single_target_regressor_uncertainty_layout_in_mother_cv():
+    """Plain single-target NODERegressor through mother_cv (multi-target is covered above)."""
+    from mother.pipeline_utils import mother_cv
+
+    X, cv = _cv_frame()
+    y = pd.Series(X["a"] * 10.0 + 100.0, index=X.index, name="y")
+
+    result = mother_cv(NODERegressor(**_NODE_CV_PARAMS), X=X, y=y, cv=cv)
+
+    assert result.shape[0] == len(X)
+    # Target series is named "y", so mother_cv prefixes the point prediction as pred_y.
+    assert {"pred_y", "pred_mean_predictions", "pred_total_uncertainty", "iteration"} <= set(result.columns)
+    assert len(result["iteration"].unique()) == 2
+
+
+@pytest.mark.parametrize(
+    "model_cls, y_from_X, scorer, expected_pred_col",
+    [
+        (NODEClassifier, lambda X: pd.Series((X["a"] > 0).astype(int), index=X.index, name="y"), "accuracy", "pred_y"),
+        (
+            NODERegressor,
+            lambda X: pd.Series(X["a"] * 10.0 + 100.0, index=X.index, name="y"),
+            "neg_mean_squared_error",
+            "pred_y",
+        ),
+    ],
+    ids=["classification", "regression"],
+)
+def test_mother_cv_with_tuner_runs_nested_optimization(model_cls, y_from_X, scorer, expected_pred_col):
+    """Minimal mother_cv + MotherTuner path for NODE (excluded from the generic algorithm sweeps)."""
+    from mother.optimization import MotherTuner
+    from mother.pipeline_utils import mother_cv
+
+    def tiny_space(X, y, trial, prefix=""):
+        # Keep nested CV fast: only tune lr; architecture stays at _NODE_NESTED_PARAMS.
+        return {f"{prefix}lr": trial.suggest_float(f"{prefix}lr", 1e-3, 1e-2, log=True)}
+
+    X, cv = _cv_frame()
+    y = y_from_X(X)
+    tuner = MotherTuner(scorer=scorer, n_trials_optuna=2, n_threads_optuna=1, n_startup_trials=1)
+
+    result = mother_cv(
+        model_cls(**_NODE_NESTED_PARAMS),
+        X=X,
+        y=y,
+        cv=cv,
+        inner_cv=cv,
+        tuner=tuner,
+        hyperparameter_space_function=tiny_space,
+        default_parameters={"lr": 5e-3},
+    )
+
+    assert result.shape[0] == len(X)
+    assert expected_pred_col in result.columns
+    assert len(result["iteration"].unique()) == 2
+    assert tuner.study is not None
+    assert len(tuner.study.trials) >= 1
+
+
+class _FastArchitectureTrial:
+    """Proxy Optuna trial: runs the real NODE suggest graph, but clamps costly knobs.
+
+    ``get_hyperparameter_space`` still calls every ``suggest_*`` (heads, dropout,
+    activations, flow params, …); only tree budget / depth / flow width are forced
+    into a tiny range so nested CV stays fast.
+    """
+
+    def __init__(self, trial):
+        self._trial = trial
+
+    def suggest_int(self, name, low, high, *args, **kwargs):
+        key = name.rsplit("__", 1)[-1]
+        if key == "total_trees":
+            return self._trial.suggest_int(name, 4, 8, step=4)
+        if key == "num_layers":
+            return self._trial.suggest_int(name, 1, 1)
+        if key == "depth":
+            return self._trial.suggest_int(name, 2, 2)
+        if key == "additional_tree_output_dim":
+            return self._trial.suggest_int(name, 0, 3)
+        if key in {"flow_transforms", "flow_bins", "flow_components"}:
+            return self._trial.suggest_int(name, 2, 2)
+        if key in {"flow_signal", "flow_degree"}:
+            return self._trial.suggest_int(name, 8, 8)
+        if key.startswith("mlp_"):
+            return self._trial.suggest_int(name, low, min(high, max(low, 32)), *args, **kwargs)
+        return self._trial.suggest_int(name, low, high, *args, **kwargs)
+
+    def suggest_float(self, *args, **kwargs):
+        return self._trial.suggest_float(*args, **kwargs)
+
+    def suggest_categorical(self, name, choices, *args, **kwargs):
+        key = name.rsplit("__", 1)[-1]
+        # Keep flow nested CV on the lightest coupling architecture.
+        if key == "flow_type" and "NICE" in choices:
+            choices = ("NICE",)
+        if key == "head_type" and "linear" in choices:
+            # Avoid sampling mlp/flow here when exercising the generic regressor space.
+            choices = tuple(c for c in choices if c in ("linear", "subset")) or choices
+        return self._trial.suggest_categorical(name, choices, *args, **kwargs)
+
+    def set_user_attr(self, *args, **kwargs):
+        return self._trial.set_user_attr(*args, **kwargs)
+
+    def __getattr__(self, name):
+        return getattr(self._trial, name)
+
+
+def _clamped_node_space(model):
+    def space(X, y, trial, prefix=""):
+        return model.get_hyperparameter_space(X, y, _FastArchitectureTrial(trial), prefix=prefix)
+
+    return space
+
+
+def _tiny_node_defaults(model, prefix=""):
+    defaults = model.default_parameters(prefix=prefix)
+    defaults[prefix + "total_trees"] = 4
+    defaults[prefix + "depth"] = 2
+    defaults[prefix + "num_layers"] = 1
+    defaults[prefix + "batch_size"] = 32
+    if prefix + "flow_transforms" in defaults or getattr(model, "head_type", None) == "flow":
+        defaults[prefix + "flow_type"] = "NICE"
+        defaults[prefix + "flow_transforms"] = 2
+    return defaults
+
+
+def test_mother_cv_return_estimators_for_node():
+    from mother.pipeline_utils import mother_cv
+
+    X, cv = _cv_frame()
+    y = pd.Series((X["a"] > 0).astype(int), index=X.index, name="y")
+
+    table, estimators = mother_cv(
+        NODEClassifier(**_NODE_NESTED_PARAMS),
+        X=X,
+        y=y,
+        cv=cv,
+        return_estimators=True,
+    )
+
+    assert table.shape[0] == len(X)
+    assert "estimators" in estimators
+    assert len(estimators["estimators"]) == cv.get_n_splits()
+    assert estimators["prediction_prefix"] == "pred_"
+    assert estimators["target_columns"] == ["y"]
+
+
+def test_mother_cv_grouped_splits_for_node():
+    from sklearn.model_selection import GroupKFold
+
+    from mother.pipeline_utils import mother_cv
+
+    X, _ = _cv_frame()
+    y = pd.Series(X["a"] * 10.0 + 100.0, index=X.index, name="y")
+    groups = pd.DataFrame({"g": np.tile(np.arange(5), len(X) // 5 + 1)[: len(X)]}, index=X.index)
+    cv = GroupKFold(n_splits=2)
+
+    result = mother_cv(NODERegressor(**_NODE_NESTED_PARAMS), X=X, y=y, cv=cv, groups=groups)
+
+    assert result.shape[0] == len(X)
+    assert "cv_group" in result.columns
+    assert result["cv_group"].notna().all()
+    assert set(result["iteration"]) == {0, 1}
+
+
+def test_mother_cv_with_clamped_full_hyperparameter_space():
+    """Exercise the real NODE suggest graph under mother_cv+tuner, with architecture clamped for speed."""
+    from mother.optimization import MotherTuner
+    from mother.pipeline_utils import mother_cv
+
+    X, cv = _cv_frame()
+    y = pd.Series(X["a"] * 10.0 + 100.0, index=X.index, name="y")
+    model = NODERegressor(**_NODE_NESTED_PARAMS, batch_size=32, tune_head=True)
+    tuner = MotherTuner(scorer="neg_mean_squared_error", n_trials_optuna=2, n_threads_optuna=1, n_startup_trials=1)
+
+    result = mother_cv(
+        model,
+        X=X,
+        y=y,
+        cv=cv,
+        inner_cv=cv,
+        tuner=tuner,
+        hyperparameter_space_function=_clamped_node_space(model),
+        default_parameters=_tiny_node_defaults(model),
+    )
+
+    assert result.shape[0] == len(X)
+    assert "pred_y" in result.columns
+    assert tuner.study is not None
+    # Real space keys (not just lr) were registered on the study.
+    sampled_keys = set().union(*(t.params.keys() for t in tuner.study.trials))
+    assert {"total_trees", "num_layers", "depth", "lr", "head_type"} <= sampled_keys
+
+
+def test_mother_cv_pipeline_with_feature_selection_and_tuner():
+    from mother.ml import PipelineWithHyperparameterRooting
+    from mother.optimization import MotherTuner
+    from mother.pipeline_utils import get_feature_selection_pipeline, mother_cv
+
+    X, cv = _cv_frame()
+    y = pd.Series((X["a"] > 0).astype(int), index=X.index, name="y")
+    feature_selector = get_feature_selection_pipeline(
+        settings={
+            "feature_selection_flags": ["DROP_CORRELATED"],
+            "correlation_threshold": 0.99,
+            "algorithm": "node",
+            "model_type": "classification_binary",
+            "target_type": "single_target",
+        },
+        pipeline_settings={"remainder": "passthrough", "verbose_feature_names_out": False},
+    ).set_output(transform="pandas")
+    pipeline = PipelineWithHyperparameterRooting(
+        [("features", feature_selector), ("model", NODEClassifier(**_NODE_NESTED_PARAMS, batch_size=32))]
+    )
+
+    def tiny_space(X, y, trial, prefix=""):
+        return {f"{prefix}model__lr": trial.suggest_float(f"{prefix}model__lr", 1e-3, 1e-2, log=True)}
+
+    tuner = MotherTuner(scorer="accuracy", n_trials_optuna=2, n_threads_optuna=1, n_startup_trials=1)
+    result = mother_cv(
+        pipeline,
+        X=X,
+        y=y,
+        cv=cv,
+        inner_cv=cv,
+        tuner=tuner,
+        hyperparameter_space_function=tiny_space,
+        default_parameters={"model__lr": 5e-3},
+    )
+
+    assert result.shape[0] == len(X)
+    assert "pred_y" in result.columns
+    assert tuner.study is not None
+
+
+def test_mother_cv_flow_head_with_tuner():
+    """Flow head is opt-in (tune_head=False); nested CV tunes flow knobs with a clamped budget."""
+    pytest.importorskip("zuko")
+    from mother.optimization import MotherTuner
+    from mother.pipeline_utils import mother_cv
+
+    X, cv = _cv_frame()
+    y = pd.Series(X["a"] * 10.0 + 100.0, index=X.index, name="y")
+    model = NODERegressor(
+        **_NODE_NESTED_PARAMS,
+        batch_size=32,
+        head_type="flow",
+        flow_type="NICE",
+        tune_head=False,
+        input_dropout=0.05,
+    )
+    tuner = MotherTuner(scorer="neg_mean_squared_error", n_trials_optuna=2, n_threads_optuna=1, n_startup_trials=1)
+
+    result = mother_cv(
+        model,
+        X=X,
+        y=y,
+        cv=cv,
+        inner_cv=cv,
+        tuner=tuner,
+        hyperparameter_space_function=_clamped_node_space(model),
+        default_parameters=_tiny_node_defaults(model),
+    )
+
+    assert result.shape[0] == len(X)
+    assert "pred_y" in result.columns
+    sampled_keys = set().union(*(t.params.keys() for t in tuner.study.trials))
+    assert "flow_type" in sampled_keys or "flow_transforms" in sampled_keys

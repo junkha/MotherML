@@ -28,7 +28,8 @@ from mother.pipeline_utils import get_feature_selection_pipeline, mother_cv
 # The generic algorithm sweeps below build each registry algorithm explicitly and have no branch for NODE
 # ("node"): its estimators need their own setup (skorch/torch training, NODE-specific parameters), so they
 # are covered by the dedicated NODE suites (test_node_unit.py, test_node_uncertainty.py,
-# test_node_target_scaling.py). Exclude it from the sweeps here.
+# test_node_target_scaling.py), including mother_cv, MotherTuner, and mother_cv+MotherTuner nested CV.
+# Exclude it from the sweeps here.
 _ALGORITHMS_WITH_OWN_TEST_SUITES = {"node"}
 STANDARD_ALGORITHMS = [a for a in get_available_algorithms() if a not in _ALGORITHMS_WITH_OWN_TEST_SUITES]
 
@@ -246,9 +247,9 @@ def all_classification_algorithms(request) -> BaseEstimator:
 
         model = TabPFNClassifierMother()
     elif algorithm == "lasso":
-        from mother.ml.models.m_lasso import LassoClassifierBinaryMother
+        from mother.ml.models.m_lasso import LassoClassifierMother
 
-        model = LassoClassifierBinaryMother()
+        model = LassoClassifierMother()
 
     elif algorithm == "tabicl":
         from mother.ml.models.m_tabicl import TabICLClassifierMother
@@ -303,9 +304,9 @@ def test_optimize_and_train_mother_cv_regression(
     tmp_path,
     monkeypatch,
 ):
-    # The LassoPipeline is not suited for multi-target regression, so we skip this test case.
+    # The LassoPipeline uses a single-target LassoRegressorMother, so we skip the multi-target case.
     if "Lasso" in regression_pipeline.__class__.__name__ and use_multitarget:
-        pytest.skip("LassoRegressorMother does not support multi-target regression.")
+        pytest.skip("The LassoPipeline uses LassoRegressorMother with target_type='single_target'.")
 
     if return_estimators:
         monkeypatch.chdir(tmp_path)

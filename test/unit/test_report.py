@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 import pytest
 from rdkit import Chem
-from sklearn.model_selection import KFold
+from sklearn.model_selection import GroupKFold, KFold, TimeSeriesSplit
 
 from mother.cv.report import cluster as cluster_report
 
@@ -266,12 +266,14 @@ class TestPlotCVIndices:
     def test_plot_cv_indices_runs_and_returns_ax(self, sample_cv_data):
         X, y, group, n_splits, cv = sample_cv_data
         _, ax = plt.subplots()
-        cluster_report.plot_cv_indices(cv, X, y, group, n_splits, ax=ax)
+        returned = cluster_report.plot_cv_indices(cv, X, y, group, n_splits, ax=ax)
 
-        # Check basic plot properties
-        assert len(ax.collections) > 0  # Should have scatter points
-        assert ax.get_xlabel() == "Sample index"
+        assert returned is ax
+        # Contiguous bars use broken_barh PolyCollections (not per-sample scatter)
+        assert len(ax.collections) > 0
+        assert ax.get_xlabel() in {"Sample index", "Sample index (sorted by group)"}
         assert ax.get_ylabel() == "CV iteration"
+        plt.close(ax.figure)
 
     def test_plot_cv_indices_axes_limits(self, sample_cv_data):
         X, y, group, n_splits, cv = sample_cv_data
@@ -291,8 +293,15 @@ class TestPlotCVIndices:
     def test_plot_cv_indices_mismatched_group_length(self, sample_cv_data):
         X, y, group, n_splits, cv = sample_cv_data
         fig, ax = plt.subplots()
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="group length"):
             cluster_report.plot_cv_indices(cv, X, y, group[:10], n_splits, ax=ax)
+        plt.close(fig)
+
+    def test_plot_cv_indices_mismatched_y_length(self, sample_cv_data):
+        X, y, group, n_splits, cv = sample_cv_data
+        fig, ax = plt.subplots()
+        with pytest.raises(ValueError, match="y length"):
+            cluster_report.plot_cv_indices(cv, X, y[:10], group, n_splits, ax=ax)
         plt.close(fig)
 
     def test_plot_cv_indices_different_n_splits(self):
@@ -305,3 +314,82 @@ class TestPlotCVIndices:
         cluster_report.plot_cv_indices(cv, X, y, group, n_splits, ax=ax)
         assert ax.get_ylim() == (n_splits + 2.2, -0.2)
         plt.close(fig)
+
+    def test_group_kfold_never_splits_a_group(self):
+        """CV indices respect groups; plot must not imply otherwise (#50 / #452)."""
+        n_samples = 60
+        X = rng.random((n_samples, 3))
+        y = rng.integers(0, 2, n_samples)
+        # Contiguous groups so the group row is easy to read
+        group = np.repeat(np.arange(12), 5)
+        n_splits = 4
+        cv = GroupKFold(n_splits=n_splits)
+
+        for train_idx, test_idx in cv.split(X, y, groups=group):
+            train_groups = set(group[train_idx])
+            test_groups = set(group[test_idx])
+            assert train_groups.isdisjoint(test_groups)
+
+        fig, ax = plt.subplots()
+        returned = cluster_report.plot_cv_indices(cv, X, y, group, n_splits, ax=ax)
+        assert returned is ax
+        assert len(ax.collections) > 0
+        # Sorted by group: one vline per interior group change (12 groups → 11 boundaries)
+        n_group_changes = len(np.unique(group)) - 1
+        assert len(ax.lines) == n_group_changes
+        assert "sorted by group" in ax.get_xlabel()
+        assert "entirely in train or test" in ax.get_title()
+        # With sort_by_group, each fold's train/test edges only fall on group boundaries
+        order = np.argsort(group, kind="stable")
+        group_plot = group[order]
+        tr, tt = next(cv.split(X, y, groups=group))
+        assign = np.zeros(n_samples)
+        inv = np.empty(n_samples, dtype=int)
+        inv[order] = np.arange(n_samples)
+        assign[inv[tt]] = 1
+        assign_changes = set(np.flatnonzero(assign[1:] != assign[:-1]) + 1)
+        group_changes = set(np.flatnonzero(group_plot[1:] != group_plot[:-1]) + 1)
+        assert assign_changes <= group_changes
+        plt.close(fig)
+
+    @pytest.mark.parametrize("max_group_boundaries, expected_lines", [(None, 0), (300, 199)])
+    def test_group_boundaries_skipped_for_many_groups(self, max_group_boundaries, expected_lines):
+        n_samples = 400
+        X = rng.random((n_samples, 2))
+        y = rng.integers(0, 2, n_samples)
+        group = np.repeat(np.arange(200), 2)
+        kwargs = {} if max_group_boundaries is None else {"max_group_boundaries": max_group_boundaries}
+
+        fig, ax = plt.subplots()
+        cluster_report.plot_cv_indices(GroupKFold(n_splits=5), X, y, group, 5, ax=ax, **kwargs)
+
+        assert len(ax.lines) == expected_lines
+        assert sorted(line.get_xdata()[0] for line in ax.lines) == list(range(2, 2 * expected_lines + 1, 2))
+        assert "200 groups" in ax.get_title()
+        plt.close(fig)
+
+    def test_time_series_split_disjoint_test_and_plot(self):
+        """TimeSeriesSplit test folds are disjoint; bars render unused regions cleanly (#51)."""
+        n_samples = 200
+        X = rng.random((n_samples, 2))
+        y = rng.integers(0, 2, n_samples)
+        group = np.zeros(n_samples, dtype=int)
+        n_splits = 5
+        cv = TimeSeriesSplit(n_splits=n_splits)
+
+        seen_test: set[int] = set()
+        for _, test_idx in cv.split(X):
+            overlap = seen_test.intersection(test_idx.tolist())
+            assert not overlap
+            seen_test.update(test_idx.tolist())
+
+        fig, ax = plt.subplots()
+        returned = cluster_report.plot_cv_indices(cv, X, y, group, n_splits, ax=ax)
+        assert returned is ax
+        assert len(ax.collections) > 0
+        plt.close(fig)
+
+    def test_contiguous_runs_helper(self):
+        labels = np.array([0.0, 0.0, 1.0, np.nan, np.nan, 1.0, 1.0])
+        runs = cluster_report._contiguous_runs(labels)
+        assert runs == [(0.0, 2.0, 0.0), (2.0, 1.0, 1.0), (5.0, 2.0, 1.0)]

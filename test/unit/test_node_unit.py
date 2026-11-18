@@ -1095,6 +1095,43 @@ def test_fast_mother_tuner():
     print("✓ MotherTuner integration successful")
 
 
+def test_fast_mother_tuner_regression():
+    """Minimal MotherTuner path for NODERegressor (classifier coverage is in test_fast_mother_tuner)."""
+    X, y = make_regression(n_samples=60, n_features=4, noise=0.1, random_state=42)
+    X_df = pd.DataFrame(X, columns=[f"feature_{i}" for i in range(X.shape[1])])
+    y_series = pd.Series(y, name="target")
+
+    reg = NODERegressor(num_trees=16, num_layers=1, max_epochs=1, batch_size=32, device="cpu", verbose=0)
+    from mother.ml import PipelineWithHyperparameterRooting
+
+    pipeline = PipelineWithHyperparameterRooting([("regressor", reg)])
+    tuner = MotherTuner(
+        scorer="neg_mean_squared_error",
+        n_trials_optuna=2,
+        n_threads_optuna=1,
+        n_startup_trials=1,
+        tuning_direction="maximize",
+    )
+    cv = KFold(n_splits=2, shuffle=True, random_state=42)
+
+    def tiny_space(X, y, trial, prefix=""):
+        return {f"{prefix}regressor__lr": trial.suggest_float(f"{prefix}regressor__lr", 1e-3, 1e-2, log=True)}
+
+    optimized = tuner.optimize(
+        estimator=pipeline,
+        X=X_df,
+        y=y_series,
+        cross_validation=cv,
+        hyperparameter_space_function=tiny_space,
+        default_parameters={"regressor__lr": 5e-3},
+    )
+
+    assert tuner.study is not None
+    assert len(tuner.study.trials) >= 2
+    predictions = optimized.predict(X_df)
+    assert len(predictions) == len(y)
+
+
 def test_fast_dataframe_categorical():
     """Fast test of DataFrame input with explicit categorical feature declaration.
 
