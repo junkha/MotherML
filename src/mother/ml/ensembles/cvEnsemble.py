@@ -409,7 +409,7 @@ class CVEnsembleClassifierMother(AbstractMotherPipeline, MetaEstimatorMixin, Cla
 
         Returns:
             pd.DataFrame: DataFrame containing predicted class probabilities and uncertainty estimates (if
-            uncertainty_for_opt=False) or only estimates of knowledge uncertainty (if uncertainty_for_opt=True).
+            uncertainty_for_opt=False) or reduced to a single uncertainty estimate (if uncertainty_for_opt=True).
         """
         raise NotImplementedError
 
@@ -689,13 +689,18 @@ class EnsembleAverageUncertaintyClassifier(CVEnsembleClassifierMother):
 
         Args:
             X (pd.DataFrame): Input data.
-            uncertainty_for_opt (bool): If True, return only knowledge uncertainty. Default is False.
+            uncertainty_for_opt (bool): If True, return only one uncertainty column. Default is False.
             aggregation_strategy (str): Strategy to aggregate probabilities. Default is "average".
             **kwargs: Additional arguments passed to each member's `predict_uncertainty` method.
 
         Returns:
             pd.DataFrame: DataFrame with 'pred', 'proba_*', and averaged uncertainty columns. If
-                uncertainty_for_opt=True, only 'knowledge_uncertainty' column is returned.
+                uncertainty_for_opt=True, only 'knowledge_uncertainty' column is returned (if available;
+                'total_uncertainty' column is returned as a fallback otherwise). Inspect the column name
+                to check which score is returned.
+
+        Raises:
+            ValueError: If neither knowledge nor total uncertainty is available and uncertainty_for_opt is True.
         """
         estimator_probas, estimator_uncertainties, available_uncertainties = self._collect_member_outputs(X, **kwargs)
         ensemble_probas = self._aggregate_probas(estimator_probas, strategy=aggregation_strategy)
@@ -705,8 +710,14 @@ class EnsembleAverageUncertaintyClassifier(CVEnsembleClassifierMother):
         )
 
         if uncertainty_for_opt:
+            uncertainty_name = "knowledge_uncertainty" if knowledge_uncertainty is not None else "total_uncertainty"
+            uncertainty_values = knowledge_uncertainty if knowledge_uncertainty is not None else total_uncertainty
+
+            if uncertainty_values is None:
+                raise ValueError("Neither knowledge nor total uncertainty is available for return.")
+
             return pd.DataFrame(
-                {"knowledge_uncertainty": knowledge_uncertainty},
+                {uncertainty_name: uncertainty_values},
                 index=X.index if isinstance(X, pd.DataFrame) else None,
             )
 
