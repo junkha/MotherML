@@ -291,7 +291,6 @@ class TestEnsembleClassifierInitialization:
 
 
 class TestSklearnCompatibility:
-
     def test_pickle_round_trip_preserves_fitted_state(self, binary_ensemble, X, tmp_path):
         expected_proba = binary_ensemble.predict_proba(X)
         expected_pred = binary_ensemble.predict(X)
