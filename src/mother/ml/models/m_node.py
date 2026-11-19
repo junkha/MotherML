@@ -3794,8 +3794,10 @@ class NODEClassifier(_BaseNODEEstimator, NeuralNetClassifier):
             results_dict: Dict[str, Any] = {}
             for i in range(n_labels):
                 results_dict[f"target_{i}_pred"] = _prepare_for_dataframe(pred[:, i])
+            # Preserve backward compatibility: mean_predictions is unset for classifiers (NaN columns).
+            # Probabilities are reported separately as proba_target_{i} for compatibility with mother_cv.
             for i in range(n_labels):
-                results_dict[f"target_{i}_mean_predictions"] = None
+                results_dict[f"target_{i}_mean_predictions"] = np.full(len(pred), np.nan)
             for i in range(n_labels):
                 results_dict[f"proba_target_{i}"] = _prepare_for_dataframe(deterministic_probs[:, i])
 
