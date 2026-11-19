@@ -7,6 +7,167 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- version list -->
 
+## v3.6.0 (2026-11-19)
+
+### Bug Fixes
+
+- **node**: Align NODE classifier predict_uncertainty with deterministc predict_proba
+  ([#152](https://github.com/Bayer-Group/MotherML/pull/152),
+  [`5b3986a`](https://github.com/Bayer-Group/MotherML/commit/5b3986a1a84a5941e1e02dab9d29f3b1639cacba))
+
+- **node**: Preserve multi-label column contract for backward compatibility
+  ([#152](https://github.com/Bayer-Group/MotherML/pull/152),
+  [`5b3986a`](https://github.com/Bayer-Group/MotherML/commit/5b3986a1a84a5941e1e02dab9d29f3b1639cacba))
+
+- **node**: Report multi-label probabilities separately
+  ([#152](https://github.com/Bayer-Group/MotherML/pull/152),
+  [`5b3986a`](https://github.com/Bayer-Group/MotherML/commit/5b3986a1a84a5941e1e02dab9d29f3b1639cacba))
+
+### Code Style
+
+- **test**: Remove blank line ([#152](https://github.com/Bayer-Group/MotherML/pull/152),
+  [`5b3986a`](https://github.com/Bayer-Group/MotherML/commit/5b3986a1a84a5941e1e02dab9d29f3b1639cacba))
+
+### Documentation
+
+- **examples**: Adapt tutorial documentation following consecutive numbering of notebooks
+  ([#152](https://github.com/Bayer-Group/MotherML/pull/152),
+  [`5b3986a`](https://github.com/Bayer-Group/MotherML/commit/5b3986a1a84a5941e1e02dab9d29f3b1639cacba))
+
+- **examples**: Add class relation overview for ensemble class families
+  ([#152](https://github.com/Bayer-Group/MotherML/pull/152),
+  [`5b3986a`](https://github.com/Bayer-Group/MotherML/commit/5b3986a1a84a5941e1e02dab9d29f3b1639cacba))
+
+- **examples**: Add example notebook for usage of CVEnsembleClassifierMother
+  ([#152](https://github.com/Bayer-Group/MotherML/pull/152),
+  [`5b3986a`](https://github.com/Bayer-Group/MotherML/commit/5b3986a1a84a5941e1e02dab9d29f3b1639cacba))
+
+- **examples**: Demonstrate ensemble subclass differences
+  ([#152](https://github.com/Bayer-Group/MotherML/pull/152),
+  [`5b3986a`](https://github.com/Bayer-Group/MotherML/commit/5b3986a1a84a5941e1e02dab9d29f3b1639cacba))
+
+- **examples**: Demonstrate ensemble usage within Mother pipeline
+  ([#152](https://github.com/Bayer-Group/MotherML/pull/152),
+  [`5b3986a`](https://github.com/Bayer-Group/MotherML/commit/5b3986a1a84a5941e1e02dab9d29f3b1639cacba))
+
+- **examples**: Improve documentation of ensemble training and evaluation
+  ([#152](https://github.com/Bayer-Group/MotherML/pull/152),
+  [`5b3986a`](https://github.com/Bayer-Group/MotherML/commit/5b3986a1a84a5941e1e02dab9d29f3b1639cacba))
+
+- **examples**: Improve readability ([#152](https://github.com/Bayer-Group/MotherML/pull/152),
+  [`5b3986a`](https://github.com/Bayer-Group/MotherML/commit/5b3986a1a84a5941e1e02dab9d29f3b1639cacba))
+
+- **examples**: Update tutorial to use renamed Lasso classifier class
+  ([#152](https://github.com/Bayer-Group/MotherML/pull/152),
+  [`5b3986a`](https://github.com/Bayer-Group/MotherML/commit/5b3986a1a84a5941e1e02dab9d29f3b1639cacba))
+
+- **readme**: Define fitted estimator variable returned from mother_cv before using it in ensemble
+  documentation ([#152](https://github.com/Bayer-Group/MotherML/pull/152),
+  [`5b3986a`](https://github.com/Bayer-Group/MotherML/commit/5b3986a1a84a5941e1e02dab9d29f3b1639cacba))
+
+- **readme**: Update cross-validation section with CV ensemble example
+  ([#152](https://github.com/Bayer-Group/MotherML/pull/152),
+  [`5b3986a`](https://github.com/Bayer-Group/MotherML/commit/5b3986a1a84a5941e1e02dab9d29f3b1639cacba))
+
+### Features
+
+- **ml**: Accept member estimators without feature-input attributes
+  ([#152](https://github.com/Bayer-Group/MotherML/pull/152),
+  [`5b3986a`](https://github.com/Bayer-Group/MotherML/commit/5b3986a1a84a5941e1e02dab9d29f3b1639cacba))
+
+- **ml**: Accept string type uncertainty methods in derived ensembles
+  ([#152](https://github.com/Bayer-Group/MotherML/pull/152),
+  [`5b3986a`](https://github.com/Bayer-Group/MotherML/commit/5b3986a1a84a5941e1e02dab9d29f3b1639cacba))
+
+- **ml**: Adapt predict_uncertainty scheme to increase Mother compatibility of cv ensemble
+  classifiers ([#152](https://github.com/Bayer-Group/MotherML/pull/152),
+  [`5b3986a`](https://github.com/Bayer-Group/MotherML/commit/5b3986a1a84a5941e1e02dab9d29f3b1639cacba))
+
+- **ml**: Choose available uncertainty type to return for opt
+  ([#152](https://github.com/Bayer-Group/MotherML/pull/152),
+  [`5b3986a`](https://github.com/Bayer-Group/MotherML/commit/5b3986a1a84a5941e1e02dab9d29f3b1639cacba))
+
+- **ml**: Derive feature_names_in_ and n_features_in_ from member estimators
+  ([#152](https://github.com/Bayer-Group/MotherML/pull/152),
+  [`5b3986a`](https://github.com/Bayer-Group/MotherML/commit/5b3986a1a84a5941e1e02dab9d29f3b1639cacba))
+
+- **ml**: Ensemble classifiers based on MotherCV and examples
+  ([#152](https://github.com/Bayer-Group/MotherML/pull/152),
+  [`5b3986a`](https://github.com/Bayer-Group/MotherML/commit/5b3986a1a84a5941e1e02dab9d29f3b1639cacba))
+
+- **ml**: Ensure homogeneous ensembles ([#152](https://github.com/Bayer-Group/MotherML/pull/152),
+  [`5b3986a`](https://github.com/Bayer-Group/MotherML/commit/5b3986a1a84a5941e1e02dab9d29f3b1639cacba))
+
+- **ml**: Ensure non-negative uncertainty scores from ensemble-derived estimation via entropy
+  ([#152](https://github.com/Bayer-Group/MotherML/pull/152),
+  [`5b3986a`](https://github.com/Bayer-Group/MotherML/commit/5b3986a1a84a5941e1e02dab9d29f3b1639cacba))
+
+- **ml**: Ensure scikit-learn compatibility
+  ([#152](https://github.com/Bayer-Group/MotherML/pull/152),
+  [`5b3986a`](https://github.com/Bayer-Group/MotherML/commit/5b3986a1a84a5941e1e02dab9d29f3b1639cacba))
+
+- **ml**: Estimate knowledge uncertainty from averaged individual member uncertainties with
+  'member_average' method ([#152](https://github.com/Bayer-Group/MotherML/pull/152),
+  [`5b3986a`](https://github.com/Bayer-Group/MotherML/commit/5b3986a1a84a5941e1e02dab9d29f3b1639cacba))
+
+- **ml**: Expose fitted attributes immediately after successful construction
+  ([#152](https://github.com/Bayer-Group/MotherML/pull/152),
+  [`5b3986a`](https://github.com/Bayer-Group/MotherML/commit/5b3986a1a84a5941e1e02dab9d29f3b1639cacba))
+
+- **ml**: Extract member proba columns by name
+  ([#152](https://github.com/Bayer-Group/MotherML/pull/152),
+  [`5b3986a`](https://github.com/Bayer-Group/MotherML/commit/5b3986a1a84a5941e1e02dab9d29f3b1639cacba))
+
+- **ml**: Fix compatibility with parent classes
+  ([#152](https://github.com/Bayer-Group/MotherML/pull/152),
+  [`5b3986a`](https://github.com/Bayer-Group/MotherML/commit/5b3986a1a84a5941e1e02dab9d29f3b1639cacba))
+
+- **ml**: Fix default values and enhance zero-safe uncertainty prediction
+  ([#152](https://github.com/Bayer-Group/MotherML/pull/152),
+  [`5b3986a`](https://github.com/Bayer-Group/MotherML/commit/5b3986a1a84a5941e1e02dab9d29f3b1639cacba))
+
+- **ml**: Improve member probas shape validation
+  ([#152](https://github.com/Bayer-Group/MotherML/pull/152),
+  [`5b3986a`](https://github.com/Bayer-Group/MotherML/commit/5b3986a1a84a5941e1e02dab9d29f3b1639cacba))
+
+- **ml**: Introduce ensemble classifiers by combining fitted estimators from mother_cv
+  ([#152](https://github.com/Bayer-Group/MotherML/pull/152),
+  [`5b3986a`](https://github.com/Bayer-Group/MotherML/commit/5b3986a1a84a5941e1e02dab9d29f3b1639cacba))
+
+- **ml**: Rename subclasses for clear usability
+  ([#152](https://github.com/Bayer-Group/MotherML/pull/152),
+  [`5b3986a`](https://github.com/Bayer-Group/MotherML/commit/5b3986a1a84a5941e1e02dab9d29f3b1639cacba))
+
+- **ml**: Restructure uncertainty prediction
+  ([#152](https://github.com/Bayer-Group/MotherML/pull/152),
+  [`5b3986a`](https://github.com/Bayer-Group/MotherML/commit/5b3986a1a84a5941e1e02dab9d29f3b1639cacba))
+
+- **ml**: Return unedited instance on fit only when no data is passed
+  ([#152](https://github.com/Bayer-Group/MotherML/pull/152),
+  [`5b3986a`](https://github.com/Bayer-Group/MotherML/commit/5b3986a1a84a5941e1e02dab9d29f3b1639cacba))
+
+- **ml**: Split ensemble class into member-averaging and ensemble-derived subclass
+  ([#152](https://github.com/Bayer-Group/MotherML/pull/152),
+  [`5b3986a`](https://github.com/Bayer-Group/MotherML/commit/5b3986a1a84a5941e1e02dab9d29f3b1639cacba))
+
+- **ml**: Use string type uncertainty method in predict_uncertainty
+  ([#152](https://github.com/Bayer-Group/MotherML/pull/152),
+  [`5b3986a`](https://github.com/Bayer-Group/MotherML/commit/5b3986a1a84a5941e1e02dab9d29f3b1639cacba))
+
+### Testing
+
+- **unit**: Add tests for error handling ([#152](https://github.com/Bayer-Group/MotherML/pull/152),
+  [`5b3986a`](https://github.com/Bayer-Group/MotherML/commit/5b3986a1a84a5941e1e02dab9d29f3b1639cacba))
+
+- **unit**: Cover model persistance and loading with .pkl file
+  ([#152](https://github.com/Bayer-Group/MotherML/pull/152),
+  [`5b3986a`](https://github.com/Bayer-Group/MotherML/commit/5b3986a1a84a5941e1e02dab9d29f3b1639cacba))
+
+- **unit**: Update tests for subclass functionality
+  ([#152](https://github.com/Bayer-Group/MotherML/pull/152),
+  [`5b3986a`](https://github.com/Bayer-Group/MotherML/commit/5b3986a1a84a5941e1e02dab9d29f3b1639cacba))
+
+
 ## v3.5.0 (2026-11-17)
 
 ### Bug Fixes
