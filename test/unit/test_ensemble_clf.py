@@ -352,7 +352,6 @@ class TestSklearnCompatibility:
     def test_pipeline_use(self, binary_ensemble):
         pipeline = Pipeline([("model", binary_ensemble)])
         assert sk_base.is_classifier(pipeline)
-        pipeline.fit(np.array([[0], [1], [2]]), np.array([0, 1, 1]))
 
 
 class TestEnsembleClassifierParameters:
@@ -380,7 +379,9 @@ class TestEnsembleClassifierParameters:
 
     def test_fit_is_a_noop(self, binary_ensemble, X):
         estimators_before = list(binary_ensemble.estimators)
-        assert binary_ensemble.fit(X, np.array([0, 1, 1])) is binary_ensemble
+        assert binary_ensemble.fit() is binary_ensemble
+        with pytest.raises(ValueError):
+            binary_ensemble.fit(X, np.array([0, 1, 1]))
         assert binary_ensemble.estimators == estimators_before
 
 

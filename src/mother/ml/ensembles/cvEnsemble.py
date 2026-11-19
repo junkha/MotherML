@@ -194,10 +194,10 @@ class CVEnsembleClassifierMother(ABC, MetaEstimatorMixin, ClassifierMixin, BaseE
 
         return params
 
-    def fit(self, X, y, **fit_params):
+    def fit(self, X=None, y=None, **fit_params):
         """
-        No operation is performed. Since the ensemble members are pre-fitted, this method does not perform any
-        refitting.
+        No operation is performed if no data is given. Since the ensemble members are pre-fitted, this method does not
+        perform any refitting.
 
         Args:
             X (np.ndarray): Feature matrix.
@@ -206,10 +206,12 @@ class CVEnsembleClassifierMother(ABC, MetaEstimatorMixin, ClassifierMixin, BaseE
 
         Returns:
             self: Returns the ensemble instance.
+
+        Raises:
+            ValueError: If any data or fit_params are provided.
         """
-        module_logger.warning(
-            f"Ensemble members of {self.__class__.__name__} are already fitted. No refit will be performed."
-        )
+        if X or y or fit_params:
+            raise ValueError(f"Ensemble members of {self.__class__.__name__} are already fitted. Cannot refit.")
         return self
 
     def _aggregate_probas(self, estimator_probas: np.ndarray, strategy: str = "average") -> np.ndarray:
