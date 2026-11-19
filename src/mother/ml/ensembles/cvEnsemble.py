@@ -1,18 +1,15 @@
 import logging
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from copy import deepcopy
 from enum import Enum
 from typing import Optional
 
 import numpy as np
 import pandas as pd
-from optuna.trial import Trial
 from scipy.special import rel_entr
 from sklearn.base import BaseEstimator, ClassifierMixin, MetaEstimatorMixin
 from sklearn.exceptions import NotFittedError
 from sklearn.utils.validation import check_is_fitted
-
-from mother.ml.core import AbstractMotherPipeline
 
 module_logger: logging.Logger = logging.getLogger(__name__)
 
@@ -30,7 +27,7 @@ class EnsembleDerivedUncertaintyMethod(Enum):
     DISAGREEMENT = "disagreement"
 
 
-class CVEnsembleClassifierMother(AbstractMotherPipeline, MetaEstimatorMixin, ClassifierMixin, BaseEstimator):
+class CVEnsembleClassifierMother(ABC, MetaEstimatorMixin, ClassifierMixin, BaseEstimator):
     """
     Homogeneous ensemble classifier that combines predictions from multiple fixed pre-fitted estimators. As it inherits
     from `BaseEstimator`, it follows the scikit-learn estimator interface. Ensembles are meta-estimators and can
@@ -48,7 +45,7 @@ class CVEnsembleClassifierMother(AbstractMotherPipeline, MetaEstimatorMixin, Cla
     Methods:
         get_hyperparameter_space: Returns the hyperparameter search space for the ensemble (no tunable hyperparameters
         so far, so an empty dictionary is returned).
-        set_params: Sets the parameters of the ensemble (not allowed so far, so self is returned unchanged).
+        set_params: Rejects parameter updates; returns self unchanged when no parameters are provided.
         get_params: Gets the parameters of the ensemble.
         fit: Fits the ensemble (no-op as estimators are pre-fitted).
         predict: Predicts labels using the aggregated outputs of the ensemble members.
@@ -122,29 +119,11 @@ class CVEnsembleClassifierMother(AbstractMotherPipeline, MetaEstimatorMixin, Cla
             return
 
         # After validating member estimators and their class labels, set the ensemble's classes_ attribute
-        self._validate_estimators(self.estimators)
         self.classes_ = np.asarray(self.estimators[0].classes_)
 
         # Set optional feature attributes, if exposed by member estimator
         self.feature_names_in_ = getattr(self.estimators[0], "feature_names_in_", None)
         self.n_features_in_ = getattr(self.estimators[0], "n_features_in_", None)
-
-    def get_hyperparameter_space(self, X, y, trial: Trial, prefix: str = "") -> dict:
-        """
-        Returns the hyperparameter search space for the ensemble. As no tunable hyperparameters are available for the
-        ensemble itself, returns an empty dictionary.
-
-        Args:
-            X (np.ndarray): Feature matrix.
-            y (np.ndarray): Target labels.
-            trial (Trial): Optuna trial object for hyperparameter optimization.
-            prefix (str): Prefix to add to hyperparameter names.
-
-        Returns:
-            dict: Dictionary representing the hyperparameter search space.
-        """
-        # no tunable hyperparameters for the ensemble itself
-        return {}
 
     def __sklearn_clone__(self):
         """
@@ -175,25 +154,27 @@ class CVEnsembleClassifierMother(AbstractMotherPipeline, MetaEstimatorMixin, Cla
 
     def set_params(self, **params):
         """
-        Sets the parameters for the ensemble. Since the ensemble does not allow parameter updates, this method only
-        logs a warning if any parameters are provided.
+        Rejects parameter updates because ensemble members are fixed after initialization.
 
         Args:
             **params: Parameters to set.
 
         Returns:
-            self: Returns the ensemble instance.
+            self: Returns the unchanged ensemble instance when no parameters are provided.
+
+        Raises:
+            ValueError: If any parameters are provided.
         """
         if params:
-            module_logger.warning(f"Setting parameters is not allowed for {self.__class__.__name__}")
+            raise ValueError(f"Setting parameters is not allowed for {self.__class__.__name__}")
         return self
 
-    def get_params(self, deep: bool = True) -> dict:
+    def get_params(self, deep: bool = False) -> dict:
         """
         Retrieves the parameters of the ensemble.
 
         Args:
-            deep (bool): If True, will return the parameters of the estimators as well.
+            deep (bool): If True, will return the parameters of the estimators as well. Default is False.
 
         Returns:
             dict: Dictionary containing the parameters of the ensemble and its estimators.

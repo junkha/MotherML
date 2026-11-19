@@ -371,18 +371,12 @@ class TestEnsembleClassifierParameters:
             "estimator_0__param_2_key",
         }
 
-    def test_set_params_is_noop(self, binary_ensemble):
+    def test_set_params_rejects_updates_and_returns_self_without_params(self, binary_ensemble):
         estimators_before = list(binary_ensemble.estimators)
-        assert binary_ensemble.set_params(estimators=[]) is binary_ensemble
         assert binary_ensemble.set_params() is binary_ensemble
+        with pytest.raises(ValueError, match="Setting parameters is not allowed"):
+            binary_ensemble.set_params(estimators=[])
         assert binary_ensemble.estimators == estimators_before
-
-    def test_hyperparameter_space_is_empty(self, binary_ensemble, X):
-        assert binary_ensemble.get_hyperparameter_space(X, None, trial=None) == {}
-        assert binary_ensemble.get_hyperparameter_space(X, None, trial=None, prefix="model__") == {}
-
-    def test_default_parameters_is_empty(self, binary_ensemble):
-        assert binary_ensemble.default_parameters() == {}
 
     def test_fit_is_a_noop(self, binary_ensemble, X):
         estimators_before = list(binary_ensemble.estimators)
