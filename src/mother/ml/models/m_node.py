@@ -3707,11 +3707,13 @@ class NODEClassifier(_BaseNODEEstimator, NeuralNetClassifier):
         returning predictions along with uncertainty estimates in a standardised
         DataFrame.
 
-        For multi-label classification, ``pred`` and ``mean_predictions`` (probability) are
-        reported per label as ``target_{i}_pred`` / ``target_{i}_mean_predictions``. The
-        uncertainty columns sum the per-label Bernoulli entropies and mutual
-        information; these are marginal-label summaries, not joint-label entropy, so they
-        stay single columns that describe all labels together.
+        For multi-label classification, ``pred`` and deterministic probabilities from
+        ``predict_proba`` are reported per label as ``target_{i}_pred`` /
+        ``proba_target_{i}``. ``mean_predictions`` is unset for classifiers. The
+        uncertainty columns are calculated from MC-dropout samples and sum the per-label
+        Bernoulli entropies and mutual information; these are marginal-label summaries,
+        not joint-label entropy, so they stay single columns that describe all labels
+        together.
 
         Args:
             X: Input features.
@@ -3731,8 +3733,9 @@ class NODEClassifier(_BaseNODEEstimator, NeuralNetClassifier):
                   deterministic class probabilities, positional in ``classes_`` order — then the
                   terms below):
                     - ``'pred'``: Predicted class label (from deterministic softmax, consistent with predict()).
-                    - ``'mean_predictions'``: Unset (``None``) for all classifiers, as in CatBoost;
-                      the probabilities are in the ``proba_*`` columns for binary/multiclass.
+                    - ``'mean_predictions'``: Unset (``None``) for classifiers.
+                    - Multi-label probabilities: deterministic per-label probabilities
+                      from ``predict_proba``, reported as ``proba_target_{i}``.
                     - ``'knowledge_uncertainty'``: Epistemic uncertainty — mutual
                       information ``total - data`` (matches CatBoost).
                     - ``'data_uncertainty'``: Aleatoric uncertainty — mean per-pass
@@ -3771,11 +3774,11 @@ class NODEClassifier(_BaseNODEEstimator, NeuralNetClassifier):
         #   data      = mean per-pass entropy (expected entropy)      E_t[H(p_t)]
         #   knowledge = total - data (mutual information; 0 when dropout inactive)
         per_label_knowledge: Optional[npt.NDArray[Any]] = None
+        index = X.index if isinstance(X, pd.DataFrame) else None
+
         if isinstance(self.criterion_, nn.BCEWithLogitsLoss):
             # Multi-label: predictions and uncertainties are per-label
             pred = (deterministic_probs > 0.5).astype(int)
-            # mean_predictions unset (None) for classifiers, as in CatBoost
-            mean_predictions = None
             mean_bernoulli = np.stack([mean_probs, 1.0 - mean_probs], axis=-1)
             per_pass_bernoulli = np.stack([probabilities, 1.0 - probabilities], axis=-1)
             per_label_total = entropy(mean_bernoulli, axis=-1)  # (n_datapoints, n_labels)
@@ -3783,6 +3786,23 @@ class NODEClassifier(_BaseNODEEstimator, NeuralNetClassifier):
             per_label_knowledge = np.maximum(per_label_total - per_label_data, 0.0)
             total_uncertainty = per_label_total.sum(axis=-1)
             per_pass_entropy = entropy(per_pass_bernoulli, axis=-1).sum(axis=-1)
+            # For multi-label, aggregate uncertainties: sum per-label entropies
+            data_uncertainty = per_label_data.sum(axis=-1)
+            knowledge_uncertainty = per_label_knowledge.sum(axis=-1)
+
+            n_labels = pred.shape[1]
+            results_dict: Dict[str, Any] = {}
+            for i in range(n_labels):
+                results_dict[f"target_{i}_pred"] = _prepare_for_dataframe(pred[:, i])
+            for i in range(n_labels):
+                results_dict[f"target_{i}_mean_predictions"] = None
+            for i in range(n_labels):
+                results_dict[f"proba_target_{i}"] = _prepare_for_dataframe(deterministic_probs[:, i])
+
+            results_dict["knowledge_uncertainty"] = knowledge_uncertainty
+            results_dict["data_uncertainty"] = data_uncertainty
+            results_dict["total_uncertainty"] = total_uncertainty
+            results = pd.DataFrame(results_dict, index=index)
         else:
             # Binary/multiclass: use deterministic predictions for consistency
             pred = deterministic_probs.argmax(axis=1)
@@ -3790,29 +3810,10 @@ class NODEClassifier(_BaseNODEEstimator, NeuralNetClassifier):
             # Uncertainties computed from MC-dropout means
             total_uncertainty = entropy(mean_probs, axis=1)
             per_pass_entropy = entropy(probabilities, axis=2)
-        data_uncertainty = per_pass_entropy.mean(axis=0)
-        knowledge_uncertainty = np.maximum(total_uncertainty - data_uncertainty, 0.0)
-        total_uncertainty = data_uncertainty + knowledge_uncertainty
+            data_uncertainty = per_pass_entropy.mean(axis=0)
+            knowledge_uncertainty = np.maximum(total_uncertainty - data_uncertainty, 0.0)
+            total_uncertainty = data_uncertainty + knowledge_uncertainty
 
-        index = X.index if isinstance(X, pd.DataFrame) else None
-
-        if isinstance(self.criterion_, nn.BCEWithLogitsLoss):
-            # Multi-label: per-label pred / mean probability. The uncertainties sum the label entropies,
-            # so they describe all labels together and stay single columns (mother_cv derives the
-            # per-label probability columns from predict_proba itself).
-            results = _build_uncertainty_frame(
-                {
-                    "pred": pred,
-                    "mean_predictions": mean_predictions,
-                    "knowledge_uncertainty": knowledge_uncertainty,
-                    "data_uncertainty": data_uncertainty,
-                    "total_uncertainty": total_uncertainty,
-                },
-                index,
-                mean_probs.shape[1],
-                ("knowledge_uncertainty", "data_uncertainty", "total_uncertainty"),
-            )
-        else:
             # Binary / multiclass: deterministic proba_* from predict_proba() for consistency.
             # This ensures predict(), predict_proba(), and predict_uncertainty() all use the
             # same probabilities. Uncertainties are computed from MC-dropout samples.
