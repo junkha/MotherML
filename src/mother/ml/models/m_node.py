@@ -3727,13 +3727,12 @@ class NODEClassifier(_BaseNODEEstimator, NeuralNetClassifier):
         Returns:
             pd.DataFrame:
                 - If ``return_quantiles=False``: DataFrame with columns (binary and
-                  multiclass, CatBoost layout: ``pred``, then ``proba_0 … proba_{C-1}`` — the mean
-                  MC-dropout class probabilities, positional in ``classes_`` order — then the
+                  multiclass, CatBoost layout: ``pred``, then ``proba_0 … proba_{C-1}`` — the
+                  deterministic class probabilities, positional in ``classes_`` order — then the
                   terms below):
-                    - ``'pred'``: Predicted class label.
-                    - ``'mean_predictions'``: Unset (``None``) for classifiers, as in CatBoost;
-                      the probabilities are in the ``proba_*`` columns. (Multi-label: the
-                      per-label probability, as ``target_{i}_mean_predictions``.)
+                    - ``'pred'``: Predicted class label (from deterministic softmax, consistent with predict()).
+                    - ``'mean_predictions'``: Unset (``None``) for all classifiers, as in CatBoost;
+                      the probabilities are in the ``proba_*`` columns for binary/multiclass.
                     - ``'knowledge_uncertainty'``: Epistemic uncertainty — mutual
                       information ``total - data`` (matches CatBoost).
                     - ``'data_uncertainty'``: Aleatoric uncertainty — mean per-pass
@@ -3764,14 +3763,19 @@ class NODEClassifier(_BaseNODEEstimator, NeuralNetClassifier):
         # Predictive (mean) distribution across MC passes.
         mean_probs = probabilities.mean(axis=0)  # (n_datapoints, n_classes)
 
+        # Deterministic predictions for consistency with predict() and predict_proba()
+        deterministic_probs = self.predict_proba(X)
+
         # Uncertainty decomposition matching CatBoost (Malinin et al.):
         #   total     = entropy of the mean predictive distribution  H(mean_p)
         #   data      = mean per-pass entropy (expected entropy)      E_t[H(p_t)]
         #   knowledge = total - data (mutual information; 0 when dropout inactive)
         per_label_knowledge: Optional[npt.NDArray[Any]] = None
         if isinstance(self.criterion_, nn.BCEWithLogitsLoss):
-            pred = (mean_probs > 0.5).astype(int)
-            mean_predictions = mean_probs
+            # Multi-label: predictions and uncertainties are per-label
+            pred = (deterministic_probs > 0.5).astype(int)
+            # mean_predictions unset (None) for classifiers, as in CatBoost
+            mean_predictions = None
             mean_bernoulli = np.stack([mean_probs, 1.0 - mean_probs], axis=-1)
             per_pass_bernoulli = np.stack([probabilities, 1.0 - probabilities], axis=-1)
             per_label_total = entropy(mean_bernoulli, axis=-1)  # (n_datapoints, n_labels)
@@ -3780,8 +3784,10 @@ class NODEClassifier(_BaseNODEEstimator, NeuralNetClassifier):
             total_uncertainty = per_label_total.sum(axis=-1)
             per_pass_entropy = entropy(per_pass_bernoulli, axis=-1).sum(axis=-1)
         else:
-            pred = mean_probs.argmax(axis=1)
+            # Binary/multiclass: use deterministic predictions for consistency
+            pred = deterministic_probs.argmax(axis=1)
             pred = self._decode_class_labels(pred)
+            # Uncertainties computed from MC-dropout means
             total_uncertainty = entropy(mean_probs, axis=1)
             per_pass_entropy = entropy(probabilities, axis=2)
         data_uncertainty = per_pass_entropy.mean(axis=0)
@@ -3807,26 +3813,22 @@ class NODEClassifier(_BaseNODEEstimator, NeuralNetClassifier):
                 ("knowledge_uncertainty", "data_uncertainty", "total_uncertainty"),
             )
         else:
-            # Binary / multiclass, exactly the CatBoost layout: pred, proba_<class index> (positional, in
-            # ``classes_`` order), then the uncertainty terms. mean_predictions is unset for classifiers, as in
-            # CatBoost. The probabilities are the MC-dropout means, consistent with ``pred``.
-            proba = pd.DataFrame(mean_probs, index=index, columns=[f"proba_{i}" for i in range(mean_probs.shape[1])])
-            results = pd.concat(
-                [
-                    pd.DataFrame({"pred": _prepare_for_dataframe(pred)}, index=index),
-                    proba,
-                    pd.DataFrame(
-                        {
-                            "mean_predictions": None,
-                            "knowledge_uncertainty": knowledge_uncertainty,
-                            "data_uncertainty": data_uncertainty,
-                            "total_uncertainty": total_uncertainty,
-                        },
-                        index=index,
-                    ),
-                ],
-                axis=1,
+            # Binary / multiclass: deterministic proba_* from predict_proba() for consistency.
+            # This ensures predict(), predict_proba(), and predict_uncertainty() all use the
+            # same probabilities. Uncertainties are computed from MC-dropout samples.
+            proba = pd.DataFrame(
+                deterministic_probs, index=index, columns=[f"proba_{i}" for i in range(deterministic_probs.shape[1])]
             )
+
+            results_dict = {
+                "pred": _prepare_for_dataframe(pred),
+                **{f"proba_{i}": proba[f"proba_{i}"] for i in range(proba.shape[1])},
+                "mean_predictions": None,  # Unset for classifiers, as in CatBoost
+                "knowledge_uncertainty": knowledge_uncertainty,
+                "data_uncertainty": data_uncertainty,
+                "total_uncertainty": total_uncertainty,
+            }
+            results = pd.DataFrame(results_dict, index=index)
 
         if uncertainty_for_opt:
             # Multi-label: the most uncertain label (max per-label epistemic score), as CatBoost does for
