@@ -8,13 +8,18 @@ import pandas as pd
 import sklearn.base as skl_base
 import sklearn.model_selection as skl_model_sel
 from boruta import BorutaPy
+from greedyboruta import GreedyBorutaPy
 from optuna.trial import Trial
 from sklearn.base import BaseEstimator
 from sklearn.feature_selection import SelectFromModel, SelectorMixin
 from sklearn.inspection import permutation_importance
 from sklearn.model_selection import RepeatedKFold
 from sklearn.preprocessing import robust_scale
-from sklearn.utils.validation import check_is_fitted
+from sklearn.utils.validation import (
+    check_array,
+    check_consistent_length,
+    check_is_fitted,
+)
 
 from mother import ml, utils
 from mother.ml.models.m_catboost import CatBoostClassifier, CatBoostRegressor
@@ -382,6 +387,22 @@ class MotherSelectFromModel(SelectFromModel, ml.AbstractMotherPipeline):
         return suggested_params
 
 
+def _check_boruta_params(selector, X, y) -> None:
+    """Validate Boruta input like BorutaPy, but accept multi-target y with missing values.
+
+    BorutaPy and GreedyBorutaPy only pass y on to the importance estimator, and the Mother
+    importance estimators support multi-target y, with missing values for
+    MultiRMSEWithMissingValues. Their check_X_y would reject both.
+    """
+    check_array(X)
+    check_array(y, ensure_2d=False, ensure_all_finite="allow-nan", dtype=None, input_name="y")
+    check_consistent_length(X, y)
+    if selector.perc <= 0 or selector.perc > 100:
+        raise ValueError("The percentile should be between 0 and 100.")
+    if selector.alpha <= 0 or selector.alpha > 1:
+        raise ValueError("Alpha should be between 0 and 1.")
+
+
 class MotherBorutaPy(SelectorMixin, BorutaPy):
     """
     A DataFrame-compatible extension of BorutaPy with scikit-learn set_output support.
@@ -403,6 +424,11 @@ class MotherBorutaPy(SelectorMixin, BorutaPy):
     This wrapper is especially useful for users who work with pandas DataFrames and require
     feature selection results that retain DataFrame structure, or who wish to leverage
     scikit-learn's output configuration for better pipeline integration.
+
+    This is standard Boruta: features are confirmed or rejected by a statistical test over
+    up to ``max_iter`` iterations, which rejects noise features reliably but is slow on many
+    features. Use it when a statistically sound selection matters. ``MotherGreedyBorutaPy``
+    is a much faster variant that keeps all relevant features but also some noise features.
 
         Parameters
     ----------
@@ -509,6 +535,9 @@ class MotherBorutaPy(SelectorMixin, BorutaPy):
         else:
             return self.support_
 
+    def _check_params(self, X, y):
+        _check_boruta_params(self, X, y)
+
     def fit(self, X: typing.Union[pd.DataFrame, np.ndarray], y: typing.Union[pd.Series, np.ndarray]):
         """
         Fit the MotherBorutaPy model.
@@ -550,3 +579,114 @@ class MotherBorutaPy(SelectorMixin, BorutaPy):
         if not hasattr(self, "n_features_in_"):
             self.n_features_in_ = len(self.support_)
         return super().get_feature_names_out(input_features=input_features)
+
+
+class MotherGreedyBorutaPy(SelectorMixin, GreedyBorutaPy):
+    """
+    A DataFrame-compatible extension of GreedyBorutaPy with scikit-learn set_output support.
+
+    Greedy Boruta is a faster variant of Boruta: a feature is confirmed as soon as its
+    importance beats the maximum shadow importance once, and the number of iterations is
+    fixed up front from ``alpha`` and the number of features (for example 9 iterations for
+    20 features) instead of running up to ``max_iter`` iterations with a statistical test.
+    Features without any hit are rejected, so there are no tentative features.
+
+    Compared to standard Boruta (``MotherBorutaPy``) it is much faster and keeps all
+    relevant features reliably, but because a single hit is enough it also lets some noise
+    features through (a noise feature survives ``K`` iterations with probability of roughly
+    ``1 - (n / (n + 1)) ** K`` for ``n`` features, about a third for 20 features). That is
+    usually acceptable before a model that weights features itself. Use ``MotherBorutaPy``
+    when a statistically sound selection matters, for example when the selected features
+    themselves are interpreted.
+
+    Like standard Boruta it determines the number of selected features itself and has no
+    hyperparameters to tune, so its result does not change between Optuna trials.
+
+    Like ``MotherBorutaPy``, it preserves column names for pandas input and supports
+    ``set_output(transform="pandas")``.
+
+    Parameters
+    ----------
+    estimator : object
+        A Mother importance estimator (e.g., MotherCatboostImportance or
+        MotherPermutationImportance).
+
+    n_estimators : int or 'auto', default='auto'
+        Number of estimators to build. If 'auto', this is determined automatically
+        based on the number of features.
+
+    perc : int, default=100
+        Percentile of the shadow importances used as threshold for a hit.
+
+    alpha : float, default=0.05
+        Significance level for rejecting features without hits; determines the
+        number of iterations together with the number of features.
+
+    bonferroni : bool, default=True
+        If True, divide ``alpha`` by the number of features before computing the
+        number of iterations.
+
+    n_jobs : int, default=1
+        Number of iterations to run in parallel. Results do not depend on it.
+
+    random_state : int, RandomState or None, default=42
+        Seed for the shadow features and the estimator in each iteration.
+
+    verbose : int, default=0
+        0: no output, 1: number of iterations and final summary.
+    """
+
+    def __init__(
+        self,
+        estimator,
+        n_estimators: typing.Union[str, int] = "auto",
+        perc: int = 100,
+        alpha: float = 0.05,
+        bonferroni: bool = True,
+        n_jobs: int = 1,
+        random_state: typing.Union[int, np.random.RandomState] = 42,
+        verbose: int = 0,
+    ):
+        super().__init__(
+            estimator=estimator,
+            n_estimators=n_estimators,
+            perc=perc,
+            alpha=alpha,
+            bonferroni=bonferroni,
+            n_jobs=n_jobs,
+            random_state=random_state,
+            verbose=verbose,
+        )
+
+    def fit_transform(self, X, y):
+        """Fit to data, then transform it with SelectorMixin's transform."""
+        return self.fit(X, y).transform(X)
+
+    def _get_support_mask(self):
+        """Boolean mask of confirmed features. Implements SelectorMixin requirement."""
+        check_is_fitted(self, ["support_"])
+        return self.support_
+
+    def _check_params(self, X, y):
+        _check_boruta_params(self, X, y)
+
+    def fit(self, X: typing.Union[pd.DataFrame, np.ndarray], y: typing.Union[pd.Series, np.ndarray]):
+        """
+        Fit the MotherGreedyBorutaPy model.
+
+        Parameters
+        ----------
+        X : array-like, shape = [n_samples, n_features]
+            The training input samples.
+        y : array-like, shape = [n_samples]
+            The target values.
+
+        Returns
+        -------
+        self : object
+        """
+        if isinstance(X, pd.DataFrame):
+            self.feature_names_in_ = np.array(X.columns)
+        self.n_features_in_ = X.shape[1]
+
+        return super().fit(X, y)

@@ -18,7 +18,7 @@ from sklearn.preprocessing import StandardScaler
 
 from mother import ml
 from mother.ml import estimators as mother_estimators
-from mother.ml.estimators import MotherBorutaPy
+from mother.ml.estimators import MotherBorutaPy, MotherGreedyBorutaPy
 from mother.pipeline_utils import (
     get_cv_folds,
     get_feature_generation_pipeline,
@@ -536,8 +536,16 @@ def use_boruta(request):
     return request.param
 
 
+@pytest.fixture(params=[True, False])
+def greedy_boruta(request):
+    """
+    Fixture that provides True and False values for choosing Greedy or standard Boruta.
+    """
+    return request.param
+
+
 def test_get_importance_selector_catboost(
-    settings: MotherSettings, features: pd.DataFrame, data: pd.DataFrame, use_boruta
+    settings: MotherSettings, features: pd.DataFrame, data: pd.DataFrame, use_boruta, greedy_boruta
 ) -> None:
     settings.model.algorithm = "catboost"
     settings.model.model_type = "regression"
@@ -546,13 +554,13 @@ def test_get_importance_selector_catboost(
     settings.model.feature_selection_max_features = 10
 
     if use_boruta:
-        selector_boruta: MotherBorutaPy = get_importance_selector(
-            model_settings=settings.model.model_dump(), cv=None, use_boruta=use_boruta
+        selector_boruta = get_importance_selector(
+            model_settings=settings.model.model_dump(), cv=None, use_boruta=use_boruta, greedy_boruta=greedy_boruta
         )
-        assert isinstance(selector_boruta, MotherBorutaPy)
+        assert isinstance(selector_boruta, MotherGreedyBorutaPy if greedy_boruta else MotherBorutaPy)
     else:
         selector: skl_feature_sel.SelectFromModel = get_importance_selector(
-            model_settings=settings.model.model_dump(), cv=None, use_boruta=use_boruta
+            model_settings=settings.model.model_dump(), cv=None, use_boruta=use_boruta, greedy_boruta=greedy_boruta
         )
         assert selector.threshold == 0.01
         assert selector.max_features == 10
@@ -561,7 +569,9 @@ def test_get_importance_selector_catboost(
         # selector.fit_transform(features, data[settings.target_columns])
 
 
-def test_get_importance_selector_permutation(settings: MotherSettings, features: pd.DataFrame, cv, use_boruta) -> None:
+def test_get_importance_selector_permutation(
+    settings: MotherSettings, features: pd.DataFrame, cv, use_boruta, greedy_boruta
+) -> None:
     settings.model.algorithm = "catboost"
     settings.model.model_type = "classification_binary"
     settings.model.feature_selection_type = "permutation"
@@ -569,18 +579,96 @@ def test_get_importance_selector_permutation(settings: MotherSettings, features:
     settings.model.feature_selection_max_features = 10
 
     if use_boruta:
-        selector_boruta: MotherBorutaPy = get_importance_selector(
-            model_settings=settings.model.model_dump(), cv=None, use_boruta=use_boruta
+        selector_boruta = get_importance_selector(
+            model_settings=settings.model.model_dump(), cv=None, use_boruta=use_boruta, greedy_boruta=greedy_boruta
         )
-        assert isinstance(selector_boruta, MotherBorutaPy)
+        assert isinstance(selector_boruta, MotherGreedyBorutaPy if greedy_boruta else MotherBorutaPy)
     else:
         selector: skl_feature_sel.SelectFromModel = get_importance_selector(
-            model_settings=settings.model.model_dump(), cv=cv, use_boruta=use_boruta
+            model_settings=settings.model.model_dump(), cv=cv, use_boruta=use_boruta, greedy_boruta=greedy_boruta
         )
         assert selector is not None
         assert isinstance(selector.estimator, mother_estimators.MotherPermutationImportance)
         assert selector.threshold == 0.01
         assert selector.max_features == 10
+
+
+def test_get_importance_selector_boruta_defaults_to_greedy(settings: MotherSettings) -> None:
+    settings.model.algorithm = "catboost"
+    settings.model.model_type = "regression"
+    settings.model.feature_selection_type = "catboost"
+
+    selector = get_importance_selector(model_settings=settings.model.model_dump(), cv=None, use_boruta=True)
+    assert isinstance(selector, MotherGreedyBorutaPy)
+
+
+def _multi_target_data(case: str) -> typing.Tuple[pd.DataFrame, np.ndarray, str]:
+    """Target 0 depends only on feature_0 and target 1 only on feature_1; the rest is noise.
+
+    Selecting both features therefore requires that both targets enter the importances.
+    Returns X, y and the model type.
+    """
+    rng = np.random.default_rng(0)
+    X = pd.DataFrame(rng.normal(size=(150, 6)), columns=[f"feature_{i}" for i in range(6)])
+    signal = np.column_stack([3 * X["feature_0"], 2 * X["feature_1"]])
+    if case == "classification_binary":
+        return X, (signal > 0).astype(int), "classification_binary"
+    y = signal + rng.normal(scale=0.1, size=signal.shape)
+    if case == "regression_with_missing":
+        y[::7, 0] = np.nan
+        y[3::11, 1] = np.nan
+    return X, y, "regression"
+
+
+@pytest.mark.parametrize("case", ["regression", "regression_with_missing", "classification_binary"])
+@pytest.mark.parametrize("greedy_boruta", [True, False])
+def test_get_importance_selector_boruta_multi_target(settings: MotherSettings, case, greedy_boruta) -> None:
+    X, y, model_type = _multi_target_data(case)
+    settings.model.algorithm = "catboost"
+    settings.model.model_type = model_type
+    settings.model.target_type = "multi_target"
+    settings.model.feature_selection_type = "catboost"
+
+    selector = get_importance_selector(
+        model_settings=settings.model.model_dump(), cv=None, use_boruta=True, greedy_boruta=greedy_boruta
+    )
+    if not greedy_boruta:
+        selector.set_params(max_iter=10)
+    X_selected = selector.set_output(transform="pandas").fit_transform(X, y)
+
+    assert isinstance(selector, MotherGreedyBorutaPy if greedy_boruta else MotherBorutaPy)
+    assert X_selected.shape[0] == X.shape[0]
+    if greedy_boruta:
+        # Greedy Boruta confirms a feature after a single hit, so it keeps both relevant
+        # features but may also keep some noise features.
+        assert {"feature_0", "feature_1"} <= set(X_selected.columns)
+    else:
+        assert list(X_selected.columns) == ["feature_0", "feature_1"]
+
+
+@pytest.mark.parametrize("greedy_boruta", [True, False])
+def test_get_feature_selection_pipeline_boruta_multi_target_with_missing(settings: MotherSettings, greedy_boruta):
+    X, y, model_type = _multi_target_data("regression_with_missing")
+    settings.model.algorithm = "catboost"
+    settings.model.model_type = model_type
+    settings.model.target_type = "multi_target"
+    settings.model.feature_selection_type = "catboost"
+    settings.model.feature_selection_flags = ["DROP_UNIMPORTANT"]
+
+    pipeline = get_feature_selection_pipeline(
+        settings=settings, data=X, use_boruta=True, greedy_boruta=greedy_boruta
+    ).set_output(transform="pandas")
+    if not greedy_boruta:
+        pipeline.set_params(feature_selector__importance_selector__max_iter=10)
+    X_selected = pipeline.fit_transform(X, y)
+
+    importance_selector = pipeline.named_transformers_["feature_selector"].named_steps["importance_selector"]
+    assert type(importance_selector) is (MotherGreedyBorutaPy if greedy_boruta else MotherBorutaPy)
+    assert X_selected.shape[0] == X.shape[0]
+    if greedy_boruta:
+        assert {"feature_0", "feature_1"} <= set(X_selected.columns)
+    else:
+        assert list(X_selected.columns) == ["feature_0", "feature_1"]
 
 
 def test_get_importance_selector_unsupported_algorithm(settings: MotherSettings, features: pd.DataFrame) -> None:

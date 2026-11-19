@@ -10,7 +10,7 @@ from catboost import CatBoostClassifier, CatBoostRegressor
 from scipy.stats import spearmanr
 from sklearn import datasets
 from sklearn.base import clone
-from sklearn.datasets import make_blobs, make_classification
+from sklearn.datasets import make_blobs, make_classification, make_regression
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.feature_selection import SelectFromModel
 from sklearn.metrics import accuracy_score as accuracy
@@ -23,6 +23,7 @@ from mother.ml.core import PipelineWithHyperparameterRooting
 from mother.ml.estimators import (
     MotherBorutaPy,
     MotherCatboostImportance,
+    MotherGreedyBorutaPy,
     MotherPermutationImportance,
     MotherSelectFromModel,
 )
@@ -616,9 +617,10 @@ def test_boruta_with_permutation_importance_simple():
     assert X_transformed.shape[1] <= X_df.shape[1], "Should reduce or maintain feature count"
 
 
-def test_get_feature_selection_pipeline_with_mother_boruta(sample_data):
+@pytest.mark.parametrize("greedy_boruta, boruta_class", [(True, MotherGreedyBorutaPy), (False, MotherBorutaPy)])
+def test_get_feature_selection_pipeline_with_mother_boruta(sample_data, greedy_boruta, boruta_class):
     """
-    Test if mother.pipeline_utils.get_feature_selection_pipeline works with MotherBorutaPy
+    Test if mother.pipeline_utils.get_feature_selection_pipeline works with Greedy and standard Boruta
     """
 
     X, y = sample_data
@@ -636,10 +638,12 @@ def test_get_feature_selection_pipeline_with_mother_boruta(sample_data):
     ]
 
     pipeline = mother_takes_care.get_feature_selection_pipeline(
-        settings=settings, data=X, use_boruta=True, cv=cv
+        settings=settings, data=X, use_boruta=True, greedy_boruta=greedy_boruta, cv=cv
     ).set_output(transform="pandas")
 
     pipeline.fit(X, y)
+    importance_selector = pipeline.named_transformers_["feature_selector"].named_steps["importance_selector"]
+    assert type(importance_selector) is boruta_class
 
     # After fitting, transform should return a non-empty DataFrame
     X_transformed = pipeline.transform(X)
@@ -810,3 +814,107 @@ def test_mother_boruta_sklearn_compatibility():
     except AttributeError:
         # set_output might not be available in older sklearn versions
         pass
+
+
+def test_mother_greedy_boruta_selects_informative_features_with_pandas_output():
+    """MotherGreedyBorutaPy keeps the informative features and their column names."""
+    X, y = make_classification(
+        n_samples=200, n_features=8, n_informative=3, n_redundant=0, shuffle=False, class_sep=2.0, random_state=42
+    )
+    X_df = pd.DataFrame(X, columns=[f"feature_{i}" for i in range(X.shape[1])])
+    importance = MotherCatboostImportance(
+        estimator=CatBoostClassifier(iterations=30, max_depth=4, verbose=False, random_seed=42), percentiles=False
+    )
+    greedy = MotherGreedyBorutaPy(estimator=importance, random_state=42).set_output(transform="pandas")
+
+    X_selected = greedy.fit_transform(X_df, y)
+
+    assert greedy.max_iter == 8  # ceil(log2(8 / 0.05)) with the Bonferroni correction
+    assert {"feature_0", "feature_1", "feature_2"} <= set(X_selected.columns)
+    assert list(X_selected.columns) == list(X_df.columns[greedy.support_])
+    assert list(greedy.get_feature_names_out()) == list(X_selected.columns)
+    assert list(greedy.feature_names_in_) == list(X_df.columns)
+    assert set(greedy.ranking_) <= {1, 2}
+    assert not greedy.support_weak_.any()
+
+
+def test_mother_greedy_boruta_numpy_input_and_permutation_importance(simple_data):
+    """MotherGreedyBorutaPy works with numpy input and MotherPermutationImportance."""
+    X, y, _, _ = simple_data
+    importance = MotherPermutationImportance(
+        estimator=CatBoostClassifier(iterations=10, verbose=False, random_seed=42),
+        percentiles=False,
+        cv=KFold(n_splits=2, shuffle=True, random_state=42),
+    )
+    greedy = MotherGreedyBorutaPy(estimator=importance, random_state=42)
+
+    X_selected = greedy.fit_transform(X, y)
+
+    assert isinstance(X_selected, np.ndarray)
+    assert X_selected.shape == (X.shape[0], int(greedy.support_.sum()))
+    assert not hasattr(greedy, "feature_names_in_")
+    assert greedy.n_features_in_ == X.shape[1]
+
+
+def test_mother_greedy_boruta_raises_if_not_fitted(simple_data):
+    """MotherGreedyBorutaPy raises the standard sklearn error before fitting."""
+    X, _, X_df, _ = simple_data
+    importance = MotherCatboostImportance(estimator=CatBoostClassifier(iterations=5, verbose=False), n_estimators=5)
+    greedy = MotherGreedyBorutaPy(estimator=importance)
+
+    for call in (lambda: greedy.transform(X), lambda: greedy.transform(X_df), greedy.get_feature_names_out):
+        with pytest.raises(ValueError, match="is not fitted yet"):
+            call()
+
+
+def test_mother_greedy_boruta_get_params_and_clone():
+    """MotherGreedyBorutaPy exposes its parameters and can be cloned."""
+    importance = MotherCatboostImportance(estimator=CatBoostClassifier(iterations=5, verbose=False))
+    greedy = MotherGreedyBorutaPy(estimator=importance, alpha=0.01, bonferroni=False, n_jobs=2, verbose=1)
+
+    params = greedy.get_params(deep=False)
+    assert params["alpha"] == 0.01
+    assert params["bonferroni"] is False
+    assert params["n_jobs"] == 2
+    assert params["random_state"] == 42
+
+    cloned = clone(greedy)
+    assert isinstance(cloned, MotherGreedyBorutaPy)
+    assert cloned.get_params(deep=False)["alpha"] == 0.01
+
+
+@pytest.mark.parametrize("boruta_class", [MotherBorutaPy, MotherGreedyBorutaPy])
+@pytest.mark.parametrize("with_missing", [False, True])
+def test_mother_boruta_variants_support_multi_target(boruta_class, with_missing):
+    """Both Boruta variants accept multi-target y, with missing values for MultiRMSEWithMissingValues."""
+    X, y = make_regression(n_samples=120, n_features=6, n_informative=2, n_targets=2, shuffle=False, random_state=0)
+    X_df = pd.DataFrame(X, columns=[f"feature_{i}" for i in range(X.shape[1])])
+    if with_missing:
+        y[::7, 0] = np.nan
+        y[3::11, 1] = np.nan
+    loss = "MultiRMSEWithMissingValues" if with_missing else "MultiRMSE"
+    importance = MotherCatboostImportance(
+        estimator=CatBoostRegressor(iterations=30, loss_function=loss, verbose=False, random_seed=0, thread_count=1)
+    )
+    extra = {"max_iter": 10} if boruta_class is MotherBorutaPy else {}
+    selector = boruta_class(estimator=importance, random_state=0, **extra).set_output(transform="pandas")
+
+    X_selected = selector.fit_transform(X_df, y)
+
+    assert {"feature_0", "feature_1"} <= set(X_selected.columns)
+
+
+@pytest.mark.parametrize("boruta_class", [MotherBorutaPy, MotherGreedyBorutaPy])
+def test_mother_boruta_variants_still_validate_input(boruta_class, simple_data):
+    """Relaxing the y check keeps the X and parameter checks of BorutaPy."""
+    X, y, _, _ = simple_data
+    importance = MotherCatboostImportance(estimator=CatBoostClassifier(iterations=5, verbose=False))
+
+    X_nan = X.copy()
+    X_nan[0, 0] = np.nan
+    with pytest.raises(ValueError, match="NaN"):
+        boruta_class(estimator=importance).fit(X_nan, y)
+    with pytest.raises(ValueError, match="consistent numbers of samples"):
+        boruta_class(estimator=importance).fit(X, y[:-1])
+    with pytest.raises(ValueError, match="percentile"):
+        boruta_class(estimator=importance, perc=0).fit(X, y)

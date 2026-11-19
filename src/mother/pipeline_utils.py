@@ -42,7 +42,11 @@ from mother.ml import (
     properties,
     utils,
 )
-from mother.ml.estimators import MotherBorutaPy, MotherSelectFromModel
+from mother.ml.estimators import (
+    MotherBorutaPy,
+    MotherGreedyBorutaPy,
+    MotherSelectFromModel,
+)
 from mother.optimization import MotherTuner
 from mother.settings import MotherSettings
 
@@ -237,14 +241,50 @@ def get_importance_selector(
     model_settings: Dict,
     cv: Optional[skl_model_sel.BaseCrossValidator],
     use_boruta: bool = False,
-) -> Union[skl_feature_sel.SelectFromModel, MotherBorutaPy]:
+    greedy_boruta: bool = True,
+) -> Union[skl_feature_sel.SelectFromModel, MotherBorutaPy, MotherGreedyBorutaPy]:
     """
     Creates and returns a feature selector based on the provided settings and cross-validator.
+
+    ``feature_selection_type`` in the model settings decides where the importances come from
+    (``"catboost"`` or ``"permutation"``); ``use_boruta`` and ``greedy_boruta`` decide how
+    features are selected from them:
+
+    - ``use_boruta=False`` (default): ``MotherSelectFromModel`` keeps features above
+      ``feature_selection_threshold`` and at most ``feature_selection_max_features``. The
+      threshold is a hyperparameter, so it is re-tuned in every Optuna trial and the
+      selector has to be refitted each time. ``greedy_boruta`` is ignored.
+    - ``use_boruta=True, greedy_boruta=True`` (default when Boruta is used):
+      ``MotherGreedyBorutaPy``. Like standard Boruta it compares each feature with shuffled
+      shadow copies, but confirms a feature as soon as it beats the best shadow once and runs
+      a fixed number of iterations derived from ``alpha`` and the number of features (for
+      example 9 for 20 features) instead of up to 100. It keeps all relevant features
+      reliably but, because a single hit is enough, also lets some noise features through
+      (roughly a third of them for 20 features). This is usually a good default: the
+      downstream model still weights the remaining features itself, so a few extra noise
+      features cost little, while the selection is much faster.
+    - ``use_boruta=True, greedy_boruta=False``: ``MotherBorutaPy`` (standard Boruta).
+      It confirms or rejects each feature with a statistical test over up to 100 iterations
+      and rejects noise features reliably, but is considerably slower. Use it when a
+      statistically sound selection matters, for example when the selected features
+      themselves are interpreted or reported.
+
+    Both Boruta variants determine the number of selected features themselves and have no
+    hyperparameters to tune, so ``feature_selection_threshold`` and
+    ``feature_selection_max_features`` are not used and Optuna does not change the selection
+    step between trials. With ``settings.pipeline.memory`` set, the fitted selector can
+    therefore be cached and reused across trials.
+
+    All three options support single- and multi-target data, including missing target
+    values for multi-target regression.
 
     Args:
         settings (Dict): The settings dictionary containing model configuration.
         cv (skl_model_sel.BaseCrossValidator): The cross-validator to be used for feature selection.
-        use_boruta (bool): Whether to use the Boruta feature selection algorithm.
+        use_boruta (bool): Whether to select features with Boruta instead of an importance
+            threshold. Defaults to False.
+        greedy_boruta (bool): Only used with ``use_boruta=True``. If True (default), use
+            Greedy Boruta; if False, use standard Boruta.
 
     Returns:
         BaseEstimator: An instance of a feature selector configured according to the provided settings.
@@ -253,7 +293,8 @@ def get_importance_selector(
         ValueError: If the algorithm specified in the model settings is not supported.
     """
     selector_model: Union[catboost.CatBoostClassifier, catboost.CatBoostRegressor]
-    importance_selector: Union[skl_feature_sel.SelectFromModel, MotherBorutaPy]
+    importance_selector: Union[skl_feature_sel.SelectFromModel, MotherBorutaPy, MotherGreedyBorutaPy]
+    boruta_class = MotherGreedyBorutaPy if greedy_boruta else MotherBorutaPy
     if not ml.algo_is_supported(algorithm=model_settings["algorithm"]):
         raise ValueError(f"Unsupported algorithm: {model_settings['algorithm']}")
 
@@ -278,7 +319,7 @@ def get_importance_selector(
 
         estimator = estimators.MotherCatboostImportance(selector_model)
         if use_boruta:
-            importance_selector = MotherBorutaPy(estimator, n_estimators="auto", random_state=42)
+            importance_selector = boruta_class(estimator, n_estimators="auto", random_state=42)
         else:
             importance_selector = MotherSelectFromModel(
                 estimator=estimator,
@@ -291,7 +332,7 @@ def get_importance_selector(
         module_logger.info("Setting up permutation importance feature selection")
         estimator = estimators.MotherPermutationImportance(selector_model, cv=cv)
         if use_boruta:
-            importance_selector = MotherBorutaPy(estimator, n_estimators="auto", random_state=42)
+            importance_selector = boruta_class(estimator, n_estimators="auto", random_state=42)
         else:
             importance_selector = MotherSelectFromModel(
                 estimator=estimator,
@@ -338,6 +379,18 @@ def get_feature_selection_pipeline(
 
     Use ``remainder="passthrough"`` and pandas output with original column names
     to retain categorical, text, and embedding columns for native CatBoost input.
+
+    With the ``DROP_UNIMPORTANT`` flag, the importance selector is configured by the
+    keyword arguments ``use_boruta`` (default False) and ``greedy_boruta`` (default True,
+    only used with ``use_boruta=True``):
+
+    - ``use_boruta=False``: select features by an importance threshold tuned by Optuna.
+    - ``use_boruta=True``: Greedy Boruta, fast and without tuning; keeps all relevant
+      features plus some noise features, which the downstream model can handle.
+    - ``use_boruta=True, greedy_boruta=False``: standard Boruta, slower but statistically
+      sound; use it when the selected features themselves matter.
+
+    See ``get_importance_selector`` for when to prefer which.
     """
     model_settings: Dict = settings if isinstance(settings, dict) else settings.model.model_dump()
     pipeline_settings: Dict = (
@@ -447,11 +500,12 @@ def get_feature_selection_pipeline(
         module_logger.debug("Adding DropUnimportant feature selection to the pipeline")
 
         use_boruta: bool = kwargs.get("use_boruta", False)
-        module_logger.info("Boruta usage: %s", str(use_boruta))
+        greedy_boruta: bool = kwargs.get("greedy_boruta", True)
+        module_logger.info("Boruta usage: %s (greedy: %s)", str(use_boruta), str(greedy_boruta))
         numeric_columns_list.append(
             (
                 "importance_selector",
-                get_importance_selector(model_settings, cv, use_boruta=use_boruta),
+                get_importance_selector(model_settings, cv, use_boruta=use_boruta, greedy_boruta=greedy_boruta),
             )
         )
     if len(numeric_columns_list) != 0:

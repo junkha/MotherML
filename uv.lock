@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = ">=3.11, <3.15"
 resolution-markers = [
     "python_full_version >= '3.13'",
@@ -1555,6 +1555,22 @@ wheels = [
 ]
 
 [[package]]
+name = "greedyboruta"
+version = "1.0.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "joblib" },
+    { name = "numpy" },
+    { name = "scikit-learn" },
+    { name = "scipy", version = "1.17.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
+    { name = "scipy", version = "1.18.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/58/21/945be7b1e85e10c8ebebddbb7ae3b16d8135f4da8a3421a7fcdc113005d2/greedyboruta-1.0.0.tar.gz", hash = "sha256:f051f89ee4ec974477f8ee6ce70f6e154668e32c774f9ca2103273a43cf22687", size = 67354, upload-time = "2026-05-07T19:20:10.367Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/f2/d1/2b09ca982983f5c4c09f27ede2db7bac8adecdf4f6626d8cbc52fcf52f2a/greedyboruta-1.0.0-py3-none-any.whl", hash = "sha256:f39f05930adf6ca7c3afc83b5f18054c353d6777c22e24e8f52bfb6e7f638aae", size = 57826, upload-time = "2026-05-07T19:20:09.035Z" },
+]
+
+[[package]]
 name = "griffelib"
 version = "2.3.0"
 source = { registry = "https://pypi.org/simple" }
@@ -2678,6 +2694,7 @@ dependencies = [
     { name = "catboost" },
     { name = "colorama" },
     { name = "feature-engine" },
+    { name = "greedyboruta" },
     { name = "numpy" },
     { name = "optuna" },
     { name = "pandas" },
@@ -2765,6 +2782,7 @@ requires-dist = [
     { name = "chemprop", marker = "extra == 'chemprop'", specifier = ">=2.2,<3" },
     { name = "colorama", specifier = ">=0.4.6,<0.5" },
     { name = "feature-engine", specifier = ">=1.8.0,<2" },
+    { name = "greedyboruta", specifier = ">=1.0,<2" },
     { name = "igraph", marker = "extra == 'report'", specifier = ">=0.11.8,<0.12" },
     { name = "ipywidgets", marker = "extra == 'report'", specifier = ">=8.1.5,<9" },
     { name = "kmedoids", marker = "extra == 'clustering'", specifier = ">=0.5.3.1,<0.6" },
