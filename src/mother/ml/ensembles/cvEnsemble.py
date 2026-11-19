@@ -423,29 +423,21 @@ class EnsembleDerivedUncertaintyClassifier(CVEnsembleClassifierMother):
         super().__init__(estimators=estimators)
 
     def _calculate_uncertainty(
-        self, estimator_probas: np.ndarray, uncertainty_method: EnsembleDerivedUncertaintyMethod | str
+        self, estimator_probas: np.ndarray, uncertainty_method: EnsembleDerivedUncertaintyMethod
     ) -> tuple[Optional[np.ndarray], Optional[np.ndarray], Optional[np.ndarray]]:
         """
         Calculate uncertainty from ensemble predictions using the specified method.
 
         Args:
             estimator_probas (np.ndarray): Member probabilities, shape (n_estimators, n_samples, n_classes).
-            uncertainty_method (EnsembleDerivedUncertaintyMethod | str): Method name:
+            uncertainty_method (EnsembleDerivedUncertaintyMethod): Method name:
                 'entropy', 'variance', 'disagreement'.
 
         Returns:
             tuple[Optional[np.ndarray], Optional[np.ndarray], Optional[np.ndarray]]:
                 (knowledge_uncertainty, data_uncertainty, total_uncertainty), each shape (n_samples,).
                 data_uncertainty and total_uncertainty may be None depending on method.
-
-        Raises:
-            ValueError: If uncertainty_method is not recognized.
         """
-        try:
-            uncertainty_method = EnsembleDerivedUncertaintyMethod(uncertainty_method)
-        except (TypeError, ValueError) as e:
-            raise ValueError(f"Unknown uncertainty estimation method for ensemble model: {uncertainty_method}") from e
-
         if uncertainty_method == EnsembleDerivedUncertaintyMethod.ENTROPY:
             # This approach approximately captures the mutual information among ensemble members and
             # resulting knowledge uncertainty equals np.mean(kl_matrix, axis=0) with close-to-zero
@@ -490,7 +482,7 @@ class EnsembleDerivedUncertaintyClassifier(CVEnsembleClassifierMother):
         X: pd.DataFrame,
         uncertainty_for_opt: bool = False,
         aggregation_strategy: str = "average",
-        uncertainty_method: str | EnsembleDerivedUncertaintyMethod = EnsembleDerivedUncertaintyMethod.ENTROPY,
+        uncertainty_method: str = "entropy",
     ) -> pd.DataFrame:
         """
         Predict class labels, probabilities, and uncertainties for input data X.
@@ -514,7 +506,15 @@ class EnsembleDerivedUncertaintyClassifier(CVEnsembleClassifierMother):
         Returns:
             pd.DataFrame: DataFrame with 'pred', 'proba_*', and uncertainty columns. If uncertainty_for_opt=True,
                 only 'knowledge_uncertainty' column is returned.
+
+        Raises:
+            ValueError: If uncertainty_method is not recognized.
         """
+        try:
+            uncertainty_method = EnsembleDerivedUncertaintyMethod(uncertainty_method)
+        except (TypeError, ValueError) as e:
+            raise ValueError(f"Unknown uncertainty estimation method for ensemble model: {uncertainty_method}") from e
+
         estimator_probas = self._collect_member_probas(X)
         knowledge_uncertainty, data_uncertainty, total_uncertainty = self._calculate_uncertainty(
             estimator_probas, uncertainty_method=uncertainty_method
