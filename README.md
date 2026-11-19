@@ -338,6 +338,31 @@ mother_takes_care.mother_cv(
 )
 ```
 
+With `return_estimators=True`, mother_cv can provide all *k* fitted estimators from k-fold cross validation.
+
+```python
+import mother.pipeline_utils as mother_takes_care
+
+cv_results, estimator_dict = mother_takes_care.mother_cv(
+    estimator=model,
+    X=features,
+    y=targets,
+    groups=groups,
+    cv=cv,
+    return_estimators=True,
+)
+```
+
+If the base estimator model is a classifier, returned fitted estimators can be combined as a *CV Ensemble Classifier* in mother.
+The ensemble model can be used for predictions, i.e. with `predict_uncertainty()`:
+
+```python
+from mother.ml.ensembles.cvEnsemble import EnsembleAverageUncertaintyClassifier
+
+ensemble = EnsembleAverageUncertaintyClassifier(estimators=estimator_dict["estimators"])
+ensemble_prediction = ensemble.predict_uncertainty(X=features)
+```
+
 ### 🚴 Hyperparameter Optimization
 
 The Mother object `MotherTuner` uses optuna to optimize hyperparameters:

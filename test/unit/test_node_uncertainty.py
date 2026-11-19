@@ -348,8 +348,8 @@ def test_dropout_overrides_reach_dense_blocks(tiny_regression_data, input_rate, 
 
 
 @pytest.mark.parametrize("experts", [[[0.99, 0.99], [0.99, 0.99]], [[0.9, 0.1], [0.1, 0.9]]])
-def test_multilabel_uncertainty_uses_bernoulli_entropies(monkeypatch, experts):
-    probabilities = np.asarray(experts, dtype=np.float64)[:, None, :]
+def test_multilabel_uncertainty_uses_bernoulli_entropies(monkeypatch, experts):  #
+    probabilities = np.repeat(np.asarray(experts, dtype=np.float64)[:, None, :], repeats=2, axis=1)
     model = NODEClassifier(
         num_trees=4,
         depth=2,
@@ -359,10 +359,13 @@ def test_multilabel_uncertainty_uses_bernoulli_entropies(monkeypatch, experts):
         verbose=0,
     ).initialize()
     monkeypatch.setattr(model, "_mc_dropout_proba_samples", lambda features, num_samples: probabilities)
+    # Deterministic output probabilities are distinct from the MC samples used for entropy.
+    deterministic_probabilities = np.array([[0.75, 0.25], [0.4, 0.6]])
+    monkeypatch.setattr(model, "predict_proba", lambda X: deterministic_probabilities)
+    mean_probabilities = probabilities.mean(axis=0)  # Shape (n_datapoints, n_labels)
 
-    result = model.predict_uncertainty(np.zeros((1, 3), dtype=np.float32), num_samples=2)
+    result = model.predict_uncertainty(np.zeros((2, 3), dtype=np.float32), num_samples=2)
 
-    mean_probabilities = probabilities.mean(axis=0)
     expected_data = (
         -(probabilities * np.log(probabilities) + (1 - probabilities) * np.log1p(-probabilities))
         .sum(axis=-1)
@@ -371,17 +374,23 @@ def test_multilabel_uncertainty_uses_bernoulli_entropies(monkeypatch, experts):
     expected_total = -(
         mean_probabilities * np.log(mean_probabilities) + (1 - mean_probabilities) * np.log1p(-mean_probabilities)
     ).sum(axis=-1)
-    labels = range(mean_probabilities.shape[1])
-    assert list(result.columns) == (
+    labels = range(deterministic_probabilities.shape[1])
+    expected_columns = (
         [f"target_{i}_pred" for i in labels]
         + [f"target_{i}_mean_predictions" for i in labels]
+        + [f"proba_target_{i}" for i in labels]
         + ["knowledge_uncertainty", "data_uncertainty", "total_uncertainty"]
     )
-    np.testing.assert_array_equal(result[[f"target_{i}_pred" for i in labels]].to_numpy(), mean_probabilities > 0.5)
-    np.testing.assert_allclose(result[[f"target_{i}_mean_predictions" for i in labels]].to_numpy(), mean_probabilities)
+    assert list(result.columns) == expected_columns
+
+    np.testing.assert_array_equal(
+        result[[f"target_{i}_pred" for i in labels]].to_numpy(), deterministic_probabilities > 0.5
+    )
+    assert result[[f"target_{i}_mean_predictions" for i in labels]].isna().all().all()
+    np.testing.assert_array_equal(result[[f"proba_target_{i}" for i in labels]], deterministic_probabilities)
     np.testing.assert_allclose(result["data_uncertainty"], expected_data)
     np.testing.assert_allclose(result["total_uncertainty"], expected_total)
-    np.testing.assert_allclose(result["knowledge_uncertainty"], expected_total - expected_data, atol=1e-12)
+    np.testing.assert_allclose(result["knowledge_uncertainty"], (expected_total - expected_data), atol=1e-12)
 
     def bernoulli_entropy(p):
         return -(p * np.log(p) + (1 - p) * np.log1p(-p))
@@ -389,7 +398,7 @@ def test_multilabel_uncertainty_uses_bernoulli_entropies(monkeypatch, experts):
     per_label_knowledge = np.maximum(
         bernoulli_entropy(mean_probabilities) - bernoulli_entropy(probabilities).mean(axis=0), 0.0
     )
-    acquisition = model.predict_uncertainty(np.zeros((1, 3), dtype=np.float32), num_samples=2, uncertainty_for_opt=True)
+    acquisition = model.predict_uncertainty(np.zeros((2, 3), dtype=np.float32), num_samples=2, uncertainty_for_opt=True)
     assert list(acquisition.columns) == ["knowledge_uncertainty"]
     np.testing.assert_allclose(acquisition["knowledge_uncertainty"], per_label_knowledge.max(axis=1), atol=1e-12)
 
@@ -952,7 +961,7 @@ def test_inference_iterator_can_be_reset_without_refitting(tiny_regression_data,
 
 
 @pytest.mark.parametrize("task", ["regression", "classification", "flow"])
-def test_mc_passes_keep_rows_aligned_with_changing_batch_sizes(tiny_regression_data, monkeypatch, task):
+def test_mc_passes_keep_rows_aligned_with_changing_batch_sizes(tiny_regression_data, monkeypatch, task):  #
     if task == "flow":
         pytest.importorskip("zuko")
     features, targets = tiny_regression_data
@@ -1012,7 +1021,8 @@ def test_mc_passes_keep_rows_aligned_with_changing_batch_sizes(tiny_regression_d
     if task == "flow":
         np.testing.assert_allclose(result["pred"], inputs[:, 0], atol=1e-4)
     # Flow heads read the data for quantiles, the MC-dropout passes and the deterministic mode.
-    assert batches.iterations == {"classification": 1, "regression": 2, "flow": 3}[task]
+    # Classifiers now require two passes: one for MC-dropout samples and one for deterministic predict_proba.
+    assert batches.iterations == {"classification": 2, "regression": 2, "flow": 3}[task]
     assert all(not module.training for module in model.module_.modules())
 
 
@@ -1085,7 +1095,7 @@ def test_multilabel_and_multitarget_outputs_work_in_mother_cv():
     result = mother_cv(classifier, X=X, y=labels, cv=cv, num_samples=10)
     assert {"pred_target_0_pred", "pred_target_1_pred", "pred_knowledge_uncertainty"} <= set(result.columns)
     assert not any(result[f"pred_target_{i}_pred"].map(lambda v: hasattr(v, "__len__")).any() for i in range(2))
-    assert {"pred_proba_l0", "pred_proba_l1"} <= set(result.columns)
+    assert {"pred_proba_target_0", "pred_proba_target_1"} <= set(result.columns)
 
     targets = pd.DataFrame({"t0": X["a"] * 10 + 100, "t1": X["b"] * 0.1})
     for params in ({"head_type": "linear"}, {"head_type": "flow", "flow_type": "NICE"}):

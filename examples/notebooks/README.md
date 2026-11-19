@@ -65,6 +65,8 @@ Dive into sophisticated methods and specialized algorithms:
 | `02_binary_classification_uncertainty.ipynb` | Binary classification + uncertainty | 🟡 Intermediate | 25 min |
 | `03_ordinal_classification.ipynb` | Ranked categorical predictions | 🔴 Advanced | 35 min |
 | `04_tabicl_classification.ipynb` | Classification using tabicl with build-in SHAP explainability | 🔴 Advanced | 20 min |
+| `05_logloss_tuning_for_calibrated_outputs.ipynb` | Hyperparameter tuning with different scorers | 🟡 Intermediate | 10 min* |
+**Estimate for view-only tutorial. If tuning is performed with new parameters, total execution including optimization takes substantially longer*
 
 ### 04_feature_engineering/ - Molecular Descriptors & Selection 🔬
 **Master molecular feature generation and selection techniques**
@@ -88,5 +90,6 @@ Dive into sophisticated methods and specialized algorithms:
 | `05_NODE.ipynb` | NODE architecture, prediction heads, uncertainty, and tuning | 🔴 Advanced | 45 min |
 | `06_chemeleon.ipynb` | Generate CheMeleon fingerprints for CatBoost regression | 🔴 Advanced | 30 min |
 | `07_tabicl_embedding_transformer.ipynb` | Extract and visualize TabICL molecular embeddings | 🔴 Advanced | 30 min |
+| `08_cv_ensemble_classification.ipynb` | Ensembling with CV-fitted estimators | 🔴 Advanced | 10 min |
 
 **w/o the last optimization section. > 1h to run the optimization section*
