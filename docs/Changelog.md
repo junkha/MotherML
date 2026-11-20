@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- version list -->
 
+## v3.7.2 (2026-11-20)
+
+### Bug Fixes
+
+- **cv**: Set class attribute self.name for TimeSeriesGrouping
+  ([#162](https://github.com/Bayer-Group/MotherML/pull/162),
+  [`2fd9b02`](https://github.com/Bayer-Group/MotherML/commit/2fd9b024fcd741bcd0ea100ed2ce480f8e2f71cd))
+
+
 ## v3.7.1 (2026-11-20)
 
 ### Chores
