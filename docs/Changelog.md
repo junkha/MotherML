@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- version list -->
 
+## v3.7.0 (2026-11-20)
+
+### Documentation
+
+- **ml**: Explain Greedy vs standard Boruta and test multi-target
+  ([#155](https://github.com/Bayer-Group/MotherML/pull/155),
+  [`ad42961`](https://github.com/Bayer-Group/MotherML/commit/ad429617b83ab7a748233518a11525bf19fc03a0))
+
+### Features
+
+- **ml**: Add Greedy Boruta as default Boruta variant
+  ([#155](https://github.com/Bayer-Group/MotherML/pull/155),
+  [`ad42961`](https://github.com/Bayer-Group/MotherML/commit/ad429617b83ab7a748233518a11525bf19fc03a0))
+
+- **ml**: Add Greedy Boruta as default Boruta variant (#77)
+  ([#155](https://github.com/Bayer-Group/MotherML/pull/155),
+  [`ad42961`](https://github.com/Bayer-Group/MotherML/commit/ad429617b83ab7a748233518a11525bf19fc03a0))
+
+### Testing
+
+- **ml**: Cover Boruta variants on multi-target data
+  ([#155](https://github.com/Bayer-Group/MotherML/pull/155),
+  [`ad42961`](https://github.com/Bayer-Group/MotherML/commit/ad429617b83ab7a748233518a11525bf19fc03a0))
+
+
 ## v3.6.0 (2026-11-19)
 
 ### Bug Fixes
