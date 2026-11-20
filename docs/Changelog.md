@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- version list -->
 
+## v3.7.1 (2026-11-20)
+
+### Chores
+
+- **deps**: Bump plotly from 6.9.0 to 7.1.0
+  ([#161](https://github.com/Bayer-Group/MotherML/pull/161),
+  [`bf712bd`](https://github.com/Bayer-Group/MotherML/commit/bf712bd7554839ff3b285066e095453759fe7fd2))
+
+
 ## v3.7.0 (2026-11-20)
 
 ### Documentation
