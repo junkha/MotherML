@@ -135,6 +135,7 @@ class TimeSeriesGrouping(DefaultGrouping):
     """
 
     def __init__(self, datetime_fmt: str) -> None:
+        self.name = "time-series-group"
         self.datetime_fmt: str = datetime_fmt
 
     def fit(self, X: Iterable[Any], y=None) -> BaseEstimator:

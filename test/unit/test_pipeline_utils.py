@@ -49,6 +49,22 @@ def test_get_groups_tanimoto_grouping(settings: MotherSettings) -> None:
     assert len(result[result.columns[0]].value_counts()) == len(mol_data)
 
 
+def test_get_groups_timeseries_grouping(settings: MotherSettings) -> None:
+    assert settings is not None
+    settings.cv = {"cv_type": "time_series", "n_splits": 2, "parameters": {"datetime_fmt": "%Y-%m-%d"}}
+
+    time_col = "date"
+
+    mol_data = pd.DataFrame({"smiles": ["CCO", "CCN", "CC(=O)C"]})
+    mol_data[time_col] = pd.Series(["2023-01-01", "2023-01-02", "2023-01-02"])
+
+    result = get_groups(settings, mol_data[time_col])
+
+    assert isinstance(result, pd.DataFrame)
+    assert len(result) == len(mol_data)
+    assert result[result.columns[0]].nunique() == mol_data[time_col].nunique()
+
+
 def test_get_feature_selection_pipeline_no_feature_selection(
     settings: MotherSettings,
 ) -> None:
