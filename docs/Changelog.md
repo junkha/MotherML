@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- version list -->
 
+## v3.7.3 (2026-11-21)
+
+### Chores
+
+- **deps**: Bump tabpfn from 8.2.0 to 10.1.0
+  ([#159](https://github.com/Bayer-Group/MotherML/pull/159),
+  [`4ddacf0`](https://github.com/Bayer-Group/MotherML/commit/4ddacf0816ab8047c1fb38b3ea7f7b52d957c42f))
+
+
 ## v3.7.2 (2026-11-20)
 
 ### Bug Fixes
