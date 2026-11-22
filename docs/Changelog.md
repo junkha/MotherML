@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- version list -->
 
+## v3.7.4 (2026-11-22)
+
+### Chores
+
+- **deps-dev**: Bump pylint from 4.1.2 to 4.1.4
+  ([#160](https://github.com/Bayer-Group/MotherML/pull/160),
+  [`1f49bc9`](https://github.com/Bayer-Group/MotherML/commit/1f49bc9ce6ba3c401cda3c78f6c44f34e8144848))
+
+
 ## v3.7.3 (2026-11-21)
 
 ### Chores
