@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- version list -->
 
+## v3.7.5 (2026-11-22)
+
+### Chores
+
+- **deps-dev**: Bump pre-commit from 4.6.2 to 4.7.0
+  ([#140](https://github.com/Bayer-Group/MotherML/pull/140),
+  [`07f3f8b`](https://github.com/Bayer-Group/MotherML/commit/07f3f8bb5a4303f2a654e403f93d614202537fd1))
+
+
 ## v3.7.4 (2026-11-22)
 
 ### Chores
